@@ -1,0 +1,18 @@
+# BrandGuard Layer A Default Rules
+- id: "rule-prohibited-absolute-claim"
+  name: "Prohibited Absolute Guarantee"
+  category: "claim"
+  severity: "high"
+  rule_type: "regex"
+  pattern: "\\b(100% guarantee|guaranteed results|risk-free forever)\\b"
+  why_flagged: "Unsubstantiated absolute performance claims violate brand compliance."
+  suggested_fix: "Rephrase with qualified performance statements."
+
+- id: "rule-required-disclosure-fda"
+  name: "Required Regulatory Disclaimer"
+  category: "disclosure"
+  severity: "medium"
+  rule_type: "regex"
+  pattern: "\\b(cures|prevents disease)\\b"
+  why_flagged: "Health benefit assertions require explicit regulatory disclaimers."
+  suggested_fix: "Include mandatory standard disclosure notice."
