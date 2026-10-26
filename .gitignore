@@ -153,3 +153,11 @@ vite.config.ts.timestamp-*
 __pycache__/
 .venv/
 node_modules/
+
+.env
+.env.local
+node_modules/
+.venv/
+__pycache__/
+.next/
+.DS_Store
