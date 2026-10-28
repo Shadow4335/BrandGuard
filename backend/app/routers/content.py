@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, Upl
 
 from app.audit import log_event
 from app.auth import UserContext, get_current_user, require_roles
+from app.engine.pipeline import latest_findings
 from app.models import Approval, Comment, ContentItem, ContentVersion, Finding, ReviewRun
 from app.models.api import CommentCreateIn, ContentDetail, QueueItem, SampleOut
 from app.models.enums import UserRole
@@ -39,7 +40,7 @@ def build_detail(content: dict, user: UserContext) -> ContentDetail:
     people = names(org)
     versions = store.select("content_versions", {"content_item_id": content["id"]}, order="version_number")
     cur = next(v for v in versions if v["version_number"] == content["current_version"])
-    findings = store.select("findings", {"content_version_id": cur["id"]}, order="created_at")
+    findings = latest_findings(cur["id"])
     runs = store.select("review_runs", {"content_version_id": cur["id"]}, order="created_at", desc=True, limit=1)
     comments = []
     for v in versions:
@@ -112,7 +113,7 @@ def list_content(user: UserContext = Depends(get_current_user)):
     out = []
     for r in rows:
         v = store.select("content_versions", {"content_item_id": r["id"], "version_number": r["current_version"]})
-        fs = store.select("findings", {"content_version_id": v[0]["id"]}) if v else []
+        fs = latest_findings(v[0]["id"]) if v else []
         out.append(QueueItem(content=ContentItem(**r), creator_name=(people.get(r.get("creator_id")) or {}).get("full_name"),
                              open_high=sum(1 for f in fs if f["severity"] == "high" and f["status"] in ("open", "rejected")),
                              total_findings=len(fs)))

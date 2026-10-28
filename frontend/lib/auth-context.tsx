@@ -101,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (!mounted) return;
+        if (!mounted || getDemoSession()) return; // demo sessions are not Supabase sessions
         if (session?.user) {
           setUser(session.user);
           await fetchProfile(session.user.id);

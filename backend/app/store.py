@@ -28,6 +28,8 @@ class Store:
         rows = self.select(table, {"id": row_id, **({"org_id": org_id} if org_id else {})}, limit=1)
         return rows[0] if rows else None
     def insert(self, table: str, row: Row) -> Row: ...
+    def insert_many(self, table: str, rows: List[Row]) -> List[Row]:
+        return [self.insert(table, r) for r in rows]
     def update(self, table: str, row_id: str, patch: Row) -> Row: ...
     def put_file(self, bucket: str, path: str, data: bytes, content_type: str) -> None: ...
     def get_file(self, bucket: str, path: str) -> Optional[bytes]: ...
@@ -92,6 +94,9 @@ class SupabaseStore(Store):
 
     def insert(self, table, row):
         return self.client.table(table).insert(row).execute().data[0]
+
+    def insert_many(self, table, rows):
+        return self.client.table(table).insert(rows).execute().data if rows else []
 
     def update(self, table, row_id, patch):
         return self.client.table(table).update(patch).eq("id", row_id).execute().data[0]
