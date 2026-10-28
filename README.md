@@ -1,100 +1,82 @@
 # BrandGuard
 
-> **Pre-publication brand governance platform.**  
-> *AI suggests, humans decide. Nothing is ever auto-published or auto-edited.*
+> **Pre-publication brand governance.** Creators submit content; BrandGuard checks it against the organisation's approved guidelines, facts, terminology and regulatory references, explains every issue with the rule or source behind it, suggests fixes that keep the creator's intent, and routes it through role-based review and approval.
+> **AI suggests, humans decide. Nothing is ever auto-edited or auto-published.**
 
----
+- **Live app:** _add the Vercel URL after deploying_ (the API sleeps on Render's free tier; the app pings it on load)
+- **Backup demo video:** _add link after recording_
+- Docs: [ARCHITECTURE.md](ARCHITECTURE.md) · [AI_AND_SERVICES.md](AI_AND_SERVICES.md) · [CHECKLIST.md](CHECKLIST.md) · [BUILD_WORKFLOW.md](BUILD_WORKFLOW.md)
 
-## 🚀 Quickstart (macOS)
+## Try it in 2 minutes (no walkthrough needed)
 
-### 1. Prerequisites
-- **Python 3.11+** (`python3`)
-- **Node.js 20+** and `npm`
-- **Tesseract OCR** (optional for local visual OCR): `brew install tesseract`
+The demo brand is **GlowLeaf Naturals**, a fictional Indian personal-care brand. On the login page click a role; the password for every account is `BrandGuard2026!`.
 
----
+1. **Creator** → *New content* → **Load sample 1** → *Submit for AI review*. Highlighted issues appear with Issue, Why, rule/source chip, Fix, Severity and Confidence. Click a source chip to read the approved excerpt.
+2. **Accept** two suggestions, **Edit** one, **Reject** one (with a reason) → *Save as new version* → the diff shows exactly those changes.
+3. *Submit for review*.
+4. Use the **role switcher**: **Manager** → open the item, comment, **Escalate**.
+5. **Reviewer** → **Approve**. High-severity findings are unresolved, so a written override reason is required.
+6. Open the audit trail on the item, then **Admin** → *Insights* (charts, most-overridden rules, "Guidelines that may be unclear").
 
-### 2. Backend Setup & Run
+Sample 2 is an influencer post (missing #Ad and AI label); sample 3 is a poster image (contrast and missing alt-text); sample 4 is clean.
 
-1. Navigate to `/backend` and configure your environment:
-   ```bash
-   cp .env.example .env
-   # Edit .env with your Supabase and Gemini credentials
-   ```
+## Stack
 
-2. Create virtual environment and install dependencies:
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install --upgrade pip
-   pip install -r requirements.txt
-   ```
+Next.js (App Router, TypeScript, Tailwind, Recharts, react-diff-viewer) · FastAPI + pydantic v2 · Supabase (Postgres, Auth, Storage, pgvector, RLS) · hosted LLM + embeddings behind an adapter (Gemini by default) · PyMuPDF, python-docx, Tesseract, BeautifulSoup, rapidfuzz, Pillow · Vercel + Render (Docker).
 
-3. Start the FastAPI server (Runs on port `8000`, never `5000`):
-   ```bash
-   uvicorn app.main:app --reload --port 8000
-   ```
-   Verify status at [http://localhost:8000/health](http://localhost:8000/health).
+## Run locally (macOS)
 
----
+Offline demo mode needs **no accounts or keys**: with no Supabase credentials the API uses a seeded in-memory store and the rule-based fallback for the AI layer.
 
-### 3. Database Migration & Seed
-
-1. Copy the SQL migration in `seed/migrations/001_initial_schema.sql` and run it in your **Supabase SQL Editor** in a single paste.
-2. Run the seed script to set up the **Demo Brand** organization and 4 demo user roles:
-   ```bash
-   python3 seed/seed_users.py
-   ```
-   Demo accounts created:
-   - `admin@demo.test` (Role: `admin`)
-   - `creator@demo.test` (Role: `creator`)
-   - `manager@demo.test` (Role: `manager`)
-   - `reviewer@demo.test` (Role: `reviewer`)
-   - Default Password: `BrandGuard2026!`
-
----
-
-### 4. Frontend Setup & Run
-
-1. Navigate to `/frontend` and configure your environment:
-   ```bash
-   cp .env.example .env.local
-   # Enter your NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
-   ```
-
-2. Install dependencies and start the development server:
-   ```bash
-   npm install
-   npm run dev
-   ```
-3. Open [http://localhost:3000](http://localhost:3000) in your browser. Use the **Demo accounts** panel on the login screen for 1-click role testing.
-
----
-
-## 🏛️ Monorepo Architecture
-
-```
-BrandGuard/
-├── backend/            # FastAPI app, models, auth, YAML rules, Dockerfile
-│   ├── app/            # FastAPI source code (main.py, auth.py, config.py, models/)
-│   ├── rules/          # Layer A YAML rule definitions
-│   └── .venv/          # Python 3 virtual environment
-├── frontend/           # Next.js App Router, Tailwind CSS, shadcn/ui components
-│   ├── app/            # App Router pages and layouts
-│   └── lib/            # Types (types.ts), Supabase client
-├── seed/               # Database setup
-│   ├── migrations/     # 001_initial_schema.sql (pgvector, RLS, audit trigger)
-│   └── seed_users.py   # Idempotent demo accounts seed script
-├── docs/               # System documentation
-├── GEMINI.md           # Core platform rules & non-negotiables
-└── README.md           # This file
+```bash
+brew install tesseract                      # OCR for image checks
+cd backend && python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --port 8000
 ```
 
----
+```bash
+cd frontend && cp .env.example .env.local && npm install && npm run dev   # http://localhost:3000
+```
 
-## 🛡️ Core Rules & Compliance Notice
+Tests (offline, no keys): `cd backend && python -m pytest -q`.
 
-- **Human in the Loop**: AI provides suggestions; content changes require human review and approval.
-- **Tenant Isolation**: All database queries are scoped by `org_id` with Row-Level Security (RLS).
-- **Append-Only Audit**: The `audit_log` table strictly prevents updates and deletions via PostgreSQL trigger.
-- **Notice**: *AI-assisted review. Suggestions are never auto-applied. Not legal advice.*
+### With Supabase and a live LLM
+
+1. Create a Supabase project. In the SQL editor run `seed/migrations/001_initial_schema.sql`, then `002_workflow.sql`.
+2. Copy `backend/.env.example` to `backend/.env`; set `SUPABASE_*`, `LLM_API_KEY`, and `MOCK_LLM=false`. Copy `frontend/.env.example` to `frontend/.env.local`.
+3. Seed users, brand sources and 30 days of history (idempotent): `backend/.venv/bin/python seed/seed_demo.py`.
+
+### Environment variables
+
+| Variable | Where | Purpose |
+|---|---|---|
+| `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | backend only | database, auth verification, storage |
+| `SUPABASE_ANON_KEY` | backend + frontend | public client key |
+| `LLM_PROVIDER`, `LLM_MODEL`, `LLM_API_KEY`, `MOCK_LLM` | backend only | AI layer; unset key = offline fallback |
+| `EMBED_MODEL`, `EMBED_DIM` | backend | embeddings (768) |
+| `ALLOWED_ORIGINS` | backend | CORS (add the Vercel URL) |
+| `DEMO_USER_PASSWORD` | backend/seed | password for demo accounts |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_API_URL` | frontend | public config |
+
+Secrets live only in environment variables; `.env*` files are git-ignored.
+
+## Deploy
+
+- **Backend (Render, Docker):** root `backend/`, uses `backend/Dockerfile` (installs Tesseract). Set the backend env vars above.
+- **Frontend (Vercel):** root `frontend/`, set the three `NEXT_PUBLIC_*` vars (API URL = the Render URL).
+
+## Requirement mapping
+
+| Requirement | Where |
+|---|---|
+| Define guidelines, facts, terminology, assets | `/brand`, `sources`, YAML rules in `backend/rules` |
+| Review text, images, documents | text, PDF, DOCX, image (OCR) parsing |
+| Tone, language, facts, claims, visuals, accessibility | Layer A (rules) + Layer B (grounded AI) |
+| Explain and cite | Explanation cards, rule/source chips |
+| Suggest without overriding humans | Accept / Edit / Reject; new versions built only from decisions |
+| Comments, approvals, history, roles | workflow state machine, `approvals`, `content_versions`, `comments` |
+| Recurring problems | `/insights`, unclear-guideline flags |
+| Confidentiality and AI disclosure | RLS, private buckets, banner, `/about-ai`, AI_AND_SERVICES.md |
+
+*Not legal advice. The demo brand, facts and certifications are fictional; regulatory summaries are paraphrased, so verify against the official sources linked in each.*

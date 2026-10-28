@@ -22,7 +22,7 @@ class RetrievedSource:
 
 def stem(w: str) -> str:
     w = w.lower()
-    for suf in ("ally", "ly", "ing", "ed", "es", "s"):
+    for suf in ("ly", "ing", "ed", "es", "s"):
         if w.endswith(suf) and len(w) - len(suf) >= 3:
             return w[: -len(suf)]
     return w

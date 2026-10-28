@@ -155,7 +155,10 @@ def heuristic_layer_b(ctx: ReviewContext, sources: List[RetrievedSource]) -> AIO
                 continue
             if any(fn == (n, u) for f in facts for fn in _fact_numbers(f.text)):
                 continue  # exact figure appears in an approved fact
-            same_unit = [(f, fn) for f in relevant for fn in _fact_numbers(f.text) if fn[1] == u]
+            # a percentage only conflicts with a fact that talks about the same thing ("100% natural" vs "92% naturally derived")
+            subject = stem(after.group(1)) if after else None
+            same_unit = [(f, fn) for f in relevant for fn in _fact_numbers(f.text)
+                         if fn[1] == u and (subject is None or subject in tokens(f.text))]
             if any(fn[0] == n for _, fn in same_unit):
                 continue  # supported
             if same_unit:

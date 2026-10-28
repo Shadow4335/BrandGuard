@@ -50,3 +50,9 @@ def test_heuristic_flags_contradiction_and_unsupported():
     kinds = {(f.rule_id, tuple(f.source_codes)) for f in fs}
     assert ("RULE-CLAIM-FACT", ("FACT-001",)) in kinds
     assert any(f.rule_id == "RULE-CLAIM-UNSUPPORTED" for f in fs)
+
+
+def test_heuristic_does_not_confuse_unrelated_percentage():
+    c = ctx("GlowLeaf lip care 50% off")
+    fs = ground(heuristic_layer_b(c, [FACT, TONE]), c, [FACT, TONE])
+    assert not any(f.rule_id == "RULE-CLAIM-FACT" for f in fs)
