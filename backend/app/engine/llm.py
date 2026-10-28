@@ -1,6 +1,7 @@
 """LLM provider adapter. Reads LLM_PROVIDER / LLM_MODEL / LLM_API_KEY. Temperature 0, 20 s timeout, one retry.
 Any failure raises LLMError so the caller can fall back to the offline path."""
 import json
+import logging
 import re
 
 import httpx
@@ -8,6 +9,7 @@ import httpx
 from app.config import get_settings
 
 TIMEOUT = 20.0
+log = logging.getLogger("brandguard.llm")
 
 
 class LLMError(Exception):
@@ -68,4 +70,5 @@ def complete_json(system: str, user: str) -> dict:
             return json.loads(strip_fences(fn(system, user)))
         except Exception as e:  # network, timeout, bad JSON
             last = e
+            print(f"LLM call failed ({s.llm_provider}/{s.llm_model}): {type(e).__name__}: {str(e)[:200]}", flush=True)
     raise LLMError(str(last))
