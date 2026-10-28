@@ -35,6 +35,11 @@ async def friendly_errors(request: Request, exc: Exception):
     return JSONResponse(status_code=500, content={"detail": "Something went wrong on our side. Please try again."})
 
 
+@app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
+def root():
+    return {"service": "brandguard-api", "docs": "/docs", "health": "/api/health"}
+
+
 @app.get("/health", tags=["Health"])
 def legacy_health():
     return {"status": "ok", "service": "brandguard-api"}
