@@ -204,6 +204,7 @@ def run_layer_b(ctx: ReviewContext, sources: List[RetrievedSource]) -> Tuple[Lis
         try:
             raw = complete_json(SYSTEM, build_prompt(ctx, sources))
             return ground(AIOutput.model_validate(raw), ctx, sources), False, f"{s.llm_provider}:{s.llm_model}"
-        except (LLMError, ValidationError):
-            pass
+        except (LLMError, ValidationError) as e:
+            reason = f"{type(e).__name__}: {str(e)[:160]}".replace(s.llm_api_key, "***") if s.llm_api_key else str(e)[:160]
+            return ground(heuristic_layer_b(ctx, sources), ctx, sources), True, f"offline-heuristic (LLM failed: {reason})"
     return ground(heuristic_layer_b(ctx, sources), ctx, sources), True, "offline-heuristic"
