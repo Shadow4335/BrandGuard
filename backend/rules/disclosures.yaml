@@ -1,0 +1,19 @@
+- id: RULE-DISC-INFL-001
+  category: disclosure
+  title: Missing paid-partnership disclosure
+  severity: high
+  reference: "ASCI Guidelines for Influencer Advertising in Digital Media"
+  source_code: REG-ASCI-INFL
+  check: influencer_disclosure
+  why: "Influencer posts must carry a clear #Ad, #Sponsored or #Collab label where viewers see it first."
+  fix_template: "Start the post with #Ad (or #Sponsored / #Collab)."
+
+- id: RULE-DISC-AI-001
+  category: disclosure
+  title: Missing AI or synthetic-persona label
+  severity: medium
+  reference: "ASCI Guidelines for Influencer Advertising in Digital Media"
+  source_code: REG-ASCI-INFL
+  check: ai_label
+  why: "Content that features a digitally created persona or is AI-generated should say so."
+  fix_template: "Add a visible label such as 'Created using AI'."

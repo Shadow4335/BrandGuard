@@ -1,0 +1,23 @@
+# Layer A terminology rule: banned terms matched exactly and fuzzily (rapidfuzz >= 88).
+- id: RULE-TERM-001
+  category: terminology
+  title: Banned term
+  severity: medium
+  reference: "Brand terminology list TERM-01"
+  source_code: TERM-01
+  check: terminology
+  why: "This term is on the brand's banned list; use the approved wording."
+  fix_template: "Use the preferred term from TERM-01."
+  terms:
+    - banned: chemical-free
+      preferred: made without parabens and sulfates
+      severity: high
+    - banned: toxin-free
+      preferred: free from the ingredients listed on pack
+      severity: high
+    - banned: cure
+      forms: {cure: care for, cures: cares for, cured: cared for, curing: caring for}
+    - banned: anti-aging
+      preferred: age-care
+    - banned: cheap
+      preferred: affordable

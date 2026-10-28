@@ -1,0 +1,46 @@
+# Layer A rules: absolute, superiority, medical claims and contradictory disclaimers.
+# Each rule: id, category, title, severity, reference, source_code (a source `code` shown as a citation).
+- id: RULE-ABS-001
+  category: claim
+  title: Absolute or guaranteed claim
+  severity: high
+  reference: "CCPA Guidelines for Prevention of Misleading Advertisements, 2022"
+  source_code: REG-CCPA-2022
+  patterns:
+    - '\b100\s?%\s?(natural|organic|safe|pure)\b'
+    - '\b(guaranteed?|guarantee)\b'
+  why: "Absolute claims need complete substantiation and cannot be narrowed by fine print."
+  fix_template: "Replace with a specific, approved fact or soften to a statement you can support."
+
+- id: RULE-SUP-001
+  category: claim
+  title: Unsupported superiority claim
+  severity: high
+  reference: "ASCI Code, general advertising principles"
+  source_code: REG-ASCI-SGC
+  patterns:
+    - "\\b(asia|india|world)['\u2019]?s\\s+(largest|#\\s?1|number\\s+one|best)(\\s+[a-z]+(\\s+care)?)?"
+    - '\b(no\.?\s?1|#\s?1)\s+(brand|choice|in india)\b'
+  why: "Ranking and 'best/largest' claims need independent evidence on file."
+  fix_template: "Remove the ranking, or cite an approved fact that supports it."
+
+- id: RULE-MED-001
+  category: claim
+  title: Medical or cure claim on a cosmetic
+  severity: high
+  reference: "Drugs and Magic Remedies (Objectionable Advertisements) Act, 1954"
+  source_code: REG-DMR
+  patterns:
+    - '\b(cures?|cured|curing|heals?|healed|treats?|repairs?)\b(?!\s+(yourself|you\b|your\b))'
+  why: "Cosmetics must not be presented as treating or curing conditions."
+  fix_template: "Describe care or comfort, not treatment (for example 'care for', 'soothe')."
+
+- id: RULE-DISC-001
+  category: claim
+  title: Disclaimer contradicts the headline claim
+  severity: high
+  reference: "CCPA Guidelines for Prevention of Misleading Advertisements, 2022"
+  source_code: REG-CCPA-2022
+  check: contradictory_disclaimer
+  why: "A footnote that qualifies or contradicts the headline claim is misleading; disclaimers must not hide the main message."
+  fix_template: "Make the headline claim accurate on its own instead of relying on the footnote."

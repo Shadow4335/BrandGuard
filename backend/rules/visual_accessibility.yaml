@@ -1,0 +1,19 @@
+- id: RULE-VIS-CONTRAST-001
+  category: accessibility
+  title: Text contrast below WCAG minimum
+  severity: high
+  reference: "WCAG 2.1 success criterion 1.4.3; brand rule GUIDE-VIS-01"
+  source_code: GUIDE-VIS-01
+  check: contrast
+  why: "Text needs a contrast ratio of at least 4.5:1 (3:1 for large text) so everyone can read it."
+  fix_template: "Use darker text on a plain, light area or add a solid panel behind the text."
+
+- id: RULE-A11Y-ALT-001
+  category: accessibility
+  title: Image without alt-text
+  severity: medium
+  reference: "WCAG 2.1 success criterion 1.1.1; brand rule GUIDE-VIS-01"
+  source_code: GUIDE-VIS-01
+  check: alt_text
+  why: "Every image needs a short description so screen-reader users get the same information."
+  fix_template: "Add alt-text that describes what the image shows and says."

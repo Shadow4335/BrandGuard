@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings
-from app.routers import core, stubs
+from app.routers import content, core, sources, stubs
 
 settings = get_settings()
 
@@ -34,4 +34,6 @@ def legacy_health():
 
 
 app.include_router(core.router)
+app.include_router(sources.router)
+app.include_router(content.router)
 app.include_router(stubs.router)

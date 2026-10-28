@@ -41,6 +41,7 @@ class Finding(BaseModel):
     issue: str
     why_flagged: str
     suggested_fix: str
+    replacement: Optional[str] = None  # literal text that replaces the span if the creator accepts
     severity: FindingSeverity
     confidence: FindingConfidence
     status: FindingStatus = FindingStatus.OPEN

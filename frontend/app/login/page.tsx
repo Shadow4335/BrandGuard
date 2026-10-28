@@ -64,7 +64,7 @@ export default function LoginPage() {
     const success = await signIn(email, password);
     setLoading(false);
     if (success) {
-      router.push("/");
+      router.push("/dashboard");
     }
   };
 
@@ -77,7 +77,7 @@ export default function LoginPage() {
     const success = await signIn(demoEmail, "BrandGuard2026!");
     setLoading(false);
     if (success) {
-      router.push("/");
+      router.push("/dashboard");
     }
   };
 
@@ -123,6 +123,18 @@ export default function LoginPage() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-950">
+          <p className="font-semibold mb-2">Try it in 2 minutes</p>
+          <ol className="list-decimal pl-5 space-y-1">
+            <li>Creator: New content, Load sample 1, Submit for AI review</li>
+            <li>Accept, edit or reject each suggestion, then save a new version</li>
+            <li>Submit for review</li>
+            <li>Manager: comment and Escalate</li>
+            <li>Reviewer: Approve (an override reason is required). Then open Insights as Admin.</li>
+          </ol>
+          <p className="mt-2 text-xs">Demo password for all accounts: BrandGuard2026!</p>
         </div>
 
         {/* Form Separator */}

@@ -80,6 +80,7 @@ export interface Finding {
   issue: string;
   why_flagged: string;
   suggested_fix: string;
+  replacement?: string | null;
   severity: FindingSeverity;
   confidence: FindingConfidence;
   status: FindingStatus;

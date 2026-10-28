@@ -48,6 +48,7 @@ alter table public.findings add column if not exists run_id uuid references publ
 alter table public.findings add column if not exists source_codes text[] default array[]::text[];
 alter table public.findings add column if not exists span_text text;
 alter table public.findings add column if not exists decision_text text;
+alter table public.findings add column if not exists replacement text;
 alter table public.findings add column if not exists decided_at timestamptz;
 
 -- Approvals (one row per workflow transition)

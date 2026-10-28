@@ -1,0 +1,23 @@
+# Metadata for findings produced by the grounded AI layer (no patterns; used for titles in the UI and Insights).
+- id: RULE-TONE-HYPE
+  layer: B
+  category: tone
+  title: Tone is hyped or off-brand
+  severity: low
+  reference: "Brand voice GUIDE-TONE-01"
+  source_code: GUIDE-TONE-01
+  why: "Brand voice is warm, honest and plain-spoken with no hype."
+- id: RULE-CLAIM-FACT
+  layer: B
+  category: claim
+  title: Claim contradicts an approved fact
+  severity: high
+  reference: "Approved facts library"
+  why: "A figure or statement differs from the approved fact."
+- id: RULE-CLAIM-UNSUPPORTED
+  layer: B
+  category: claim
+  title: Unsupported claim
+  severity: medium
+  reference: "Approved facts library"
+  why: "No approved source supports this claim."
