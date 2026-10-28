@@ -120,7 +120,12 @@ export const api = {
       while ((i = buf.indexOf("\n\n")) >= 0) {
         const chunk = buf.slice(0, i); buf = buf.slice(i + 2);
         const line = chunk.split("\n").find((l) => l.startsWith("data:"));
-        if (line) onEvent(JSON.parse(line.slice(5).trim()));
+        if (line) {
+          const ev = JSON.parse(line.slice(5).trim());
+          onEvent(ev);
+          // Don't wait for the connection to close: proxies can hold it open after the last event
+          if (ev.stage === "done" || ev.stage === "error") { await reader.cancel().catch(() => {}); return; }
+        }
       }
     }
   },

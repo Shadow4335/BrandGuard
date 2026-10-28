@@ -59,7 +59,8 @@ def run_review_stream(content_id: str, user: UserContext = Depends(require_roles
         except Exception:
             yield 'data: {"stage": "error", "message": "The review could not finish. Please try again."}\n\n'
 
-    return StreamingResponse(gen(), media_type="text/event-stream")
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"})
 
 
 @router.patch("/findings/{finding_id}", response_model=Finding)
