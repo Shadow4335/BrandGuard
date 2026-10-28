@@ -25,6 +25,7 @@ class Settings(BaseModel):
     llm_provider: str = os.getenv("LLM_PROVIDER", "gemini")
     llm_api_key: str = os.getenv("LLM_API_KEY", "")
     llm_model: str = os.getenv("LLM_MODEL", "gemini-2.5-flash")
+    llm_fallback_model: str = os.getenv("LLM_FALLBACK_MODEL", "gemini-2.5-flash-lite")  # used when the main model is overloaded
     embed_model: str = os.getenv("EMBED_MODEL", "gemini-embedding-001")
     embed_dim: int = int(os.getenv("EMBED_DIM", "768"))
     supabase_url: str = os.getenv("SUPABASE_URL", "")

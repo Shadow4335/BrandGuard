@@ -22,13 +22,13 @@ def strip_fences(text: str) -> str:
     return re.sub(r"\s*```$", "", t).strip()
 
 
-def _gemini(system: str, user: str) -> str:
+def _gemini(system: str, user: str, model: str = "") -> str:
     from google import genai
     from google.genai import types
     s = get_settings()
     client = genai.Client(api_key=s.llm_api_key, http_options=types.HttpOptions(timeout=int(TIMEOUT * 1000)))
     res = client.models.generate_content(
-        model=s.llm_model, contents=user,
+        model=model or s.llm_model, contents=user,
         config=types.GenerateContentConfig(system_instruction=system, temperature=0,
                                            response_mime_type="application/json"))
     return res.text or ""
@@ -64,11 +64,19 @@ def complete_json(system: str, user: str) -> dict:
     fn = PROVIDERS.get(s.llm_provider)
     if not fn:
         raise LLMError(f"Unknown LLM_PROVIDER {s.llm_provider}")
+    # Attempts: main model, main model again after a pause (transient 503/429), then the fallback model
+    import time
+    attempts = [(s.llm_model, 0.0), (s.llm_model, 1.5)]
+    if s.llm_provider == "gemini" and s.llm_fallback_model and s.llm_fallback_model != s.llm_model:
+        attempts.append((s.llm_fallback_model, 0.0))
     last: Exception = LLMError("unknown")
-    for _ in range(2):  # one retry
+    for model, pause in attempts:
+        if pause:
+            time.sleep(pause)
         try:
-            return json.loads(strip_fences(fn(system, user)))
-        except Exception as e:  # network, timeout, bad JSON
+            text = fn(system, user, model) if s.llm_provider == "gemini" else fn(system, user)
+            return json.loads(strip_fences(text))
+        except Exception as e:  # network, timeout, overload, bad JSON
             last = e
-            print(f"LLM call failed ({s.llm_provider}/{s.llm_model}): {type(e).__name__}: {str(e)[:200]}", flush=True)
+            print(f"LLM call failed ({s.llm_provider}/{model}): {type(e).__name__}: {str(e)[:160]}", flush=True)
     raise LLMError(str(last))
