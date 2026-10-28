@@ -151,3 +151,5 @@ class InsightsSummary(BaseModel):
     trend: List[Dict[str, Any]]
     most_overridden: List[RuleStat]
     status_counts: Dict[str, int]
+    override_approvals: int = 0
+    approvals_total: int = 0

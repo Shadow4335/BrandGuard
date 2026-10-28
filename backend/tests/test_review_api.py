@@ -103,3 +103,14 @@ def test_audit_log_is_append_only():
     row = get_store().select("audit_log", limit=1)[0]
     with pytest.raises(PermissionError):
         get_store().update("audit_log", row["id"], {"event_type": "x"})
+
+
+def test_insights_are_seeded_and_flag_unclear_rule():
+    h = login("admin")
+    s = c.get("/api/insights/summary", headers=h).json()
+    assert s["total_findings"] >= 60 and s["top_rules"][0]["rule_id"] == "RULE-ABS-001"
+    assert len(s["trend"]) == 30 and s["status_counts"]
+    unclear = c.get("/api/insights/unclear-rules", headers=h).json()
+    assert "RULE-TONE-HYPE" in {u["rule_id"] for u in unclear}
+    hype = next(r for r in s["most_overridden"] if r["rule_id"] == "RULE-TONE-HYPE")
+    assert hype["override_rate"] >= 0.5

@@ -315,6 +315,8 @@ export interface InsightsSummary {
   trend: { date: string; count: number }[];
   most_overridden: RuleStat[];
   status_counts: Record<string, number>;
+  override_approvals: number;
+  approvals_total: number;
 }
 
 export interface Health {
