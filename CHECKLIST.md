@@ -15,12 +15,16 @@ Layout note: the repo's own rules (GEMINI.md) took precedence over BUILD_WORKFLO
 | Live check | Passed | Real Supabase Auth login for all roles, live Gemini review, pgvector retrieval, the full submit/escalate/override-approve flow, creator blocked (403) from adding sources, and the DB trigger blocks `audit_log` updates. Run once via a script on localhost |
 | 4B Review queue and approvals | Passed (offline demo mode, in-app browser) | Creator submit, Manager comment and escalate, Reviewer override approval with reason; audit entries visible |
 | 5 Insights | Passed | Seeded charts render; `RULE-TONE-HYPE` (62% overridden) and `RULE-CLAIM-UNSUPPORTED` appear under "may be unclear" |
-| 6 Deploy and stranger test | **Not done** | No Vercel/Render/Supabase accounts were used; the README link and demo video are placeholders |
+| 6 Deploy | Passed | Vercel + Render + Supabase live; Golden Path steps 1-10 walked through by Claude on the deployed link (real Supabase login, live Gemini review, decisions, v2 diff, submit, manager escalate, reviewer override approval, audit, Insights). Not yet done: the "stranger test" with a real first-time user, and the backup demo video |
 
 Test suite: `cd backend && python -m pytest -q` (38 tests, offline).
 
 ## Known limitations
-- **Not deployed** (Render/Vercel). Supabase and Gemini were exercised from localhost only. The API uses the service role, so RLS policies and storage policies were not exercised directly (API-level role and org checks were).
+- The API uses the Supabase service role, so RLS and storage policies were not exercised directly (API-level role and org checks were).
+- Gemini sometimes returns 503 (overloaded). The adapter retries, then tries `LLM_FALLBACK_MODEL` (`gemini-2.5-flash-lite`), then falls back to offline checks with a visible notice. Live reviews take roughly 20 seconds. Which findings the model raises varies run to run (for example "100% natural" may be labelled Unsupported rather than contradicting FACT-001).
+- Free-tier Render sleeps after ~15 minutes idle; the first request can take up to a minute.
+- The version diff viewer loads lazily and can take a few seconds the first time.
+- Findings re-order after a decision is made (decided cards move down).
 - Offline "demo mode" (in-memory store, `demo.<id>` tokens) activates only when Supabase credentials are absent. Data resets on restart.
 - Gemini (review and `gemini-embedding-001` at 768 dims) is verified live; the Anthropic and OpenAI adapters are untested. `text-embedding-004` no longer exists on the API, so the default changed. The offline heuristic stands in for the "cached Layer B" in the workflow: it is generic (numbers, superlatives, exclamations), not hash-keyed per sample, and is cruder than a model.
 - Layer A merges: chemical-free/toxin-free and cure are covered by the terminology rule, so claim rules do not list them separately.

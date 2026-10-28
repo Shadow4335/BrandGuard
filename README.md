@@ -3,7 +3,7 @@
 > **Pre-publication brand governance.** Creators submit content; BrandGuard checks it against the organisation's approved guidelines, facts, terminology and regulatory references, explains every issue with the rule or source behind it, suggests fixes that keep the creator's intent, and routes it through role-based review and approval.
 > **AI suggests, humans decide. Nothing is ever auto-edited or auto-published.**
 
-- **Live app:** _add the Vercel URL after deploying_ (the API sleeps on Render's free tier; the app pings it on load)
+- **Live app:** https://brand-guard-lovat.vercel.app (API: https://brandguard-api-74et.onrender.com). The API sleeps on Render's free tier, so the first load can take up to a minute; the app pings it on load
 - **Backup demo video:** _add link after recording_
 - Docs: [ARCHITECTURE.md](ARCHITECTURE.md) · [AI_AND_SERVICES.md](AI_AND_SERVICES.md) · [CHECKLIST.md](CHECKLIST.md) · [BUILD_WORKFLOW.md](BUILD_WORKFLOW.md)
 
