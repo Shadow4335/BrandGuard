@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings
-from app.routers import content, core, review, sources, stubs
+from app.routers import content, core, review, sources, stubs, workflow
 
 settings = get_settings()
 
@@ -37,4 +37,5 @@ app.include_router(core.router)
 app.include_router(sources.router)
 app.include_router(content.router)
 app.include_router(review.router)
+app.include_router(workflow.router)
 app.include_router(stubs.router)

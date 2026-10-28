@@ -27,7 +27,7 @@ def demo_login(body: DemoLoginIn):
     """Offline demo only: returns a token for a seeded user. Disabled when Supabase Auth is in use."""
     if get_settings().use_supabase:
         raise HTTPException(404, "Demo login is only available in offline demo mode. Use Supabase sign-in.")
-    rows = [p for p in get_store().select("profiles") if p["role"] == body.role]
+    rows = [p for p in get_store().select("profiles") if (p.get("email") or "").startswith(f"{body.role}@")]
     if not rows:
         raise HTTPException(404, "Unknown demo role. Choose admin, creator, manager or reviewer.")
     p = rows[0]

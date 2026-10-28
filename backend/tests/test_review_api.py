@@ -65,3 +65,41 @@ def test_stream_emits_progress_then_done():
     cid = create_sample(h, "clean")
     body = c.post(f"/api/content/{cid}/review/stream", headers=h).text
     assert '"stage": "layer_a"' in body and '"stage": "done"' in body
+
+
+def test_full_golden_path_through_workflow_and_audit():
+    cr, mg, rv = login("creator"), login("manager"), login("reviewer")
+    cid = create_sample(cr)
+    # cannot submit before a review exists
+    assert c.post(f"/api/content/{cid}/transition", headers=cr, json={"action": "submit"}).status_code == 409
+    c.post(f"/api/content/{cid}/review", headers=cr)
+    d = c.post(f"/api/content/{cid}/transition", headers=cr, json={"action": "submit"}).json()
+    assert d["content"]["status"] == "pending_manager"
+    assert any(i["content"]["id"] == cid for i in c.get("/api/reviews/queue", headers=mg).json())
+    assert c.post(f"/api/content/{cid}/comments", headers=mg, json={"body": "Please check the claims"}).status_code == 200
+    # a creator cannot approve their own content
+    assert c.post(f"/api/content/{cid}/transition", headers=cr, json={"action": "approve"}).status_code == 403
+    assert c.post(f"/api/content/{cid}/transition", headers=mg, json={"action": "escalate"}).json()["content"]["status"] == "escalated"
+    r = c.post(f"/api/content/{cid}/transition", headers=rv, json={"action": "approve"})
+    assert r.status_code == 409 and "override" in r.json()["detail"]
+    r = c.post(f"/api/content/{cid}/transition", headers=rv,
+               json={"action": "approve", "override": True, "reason": "Claims verified with legal"})
+    assert r.json()["content"]["status"] == "approved"
+    events = [e["event_type"] for e in c.get(f"/api/audit?content_id={cid}", headers=cr).json()]
+    for ev in ["content_created", "review_run", "workflow_submit", "workflow_escalate", "workflow_approve", "comment_added"]:
+        assert ev in events
+    ap = [a for a in r.json()["approvals"] if a["action"] == "approve"][0]
+    assert ap["override"] is True and ap["role"] == "reviewer"
+
+
+def test_org_isolation_and_unauthenticated():
+    assert c.get("/api/content").status_code in (401, 403)
+    assert c.get("/api/content/nonexistent", headers=login("creator")).status_code == 404
+
+
+def test_audit_log_is_append_only():
+    import pytest
+    from app.store import get_store
+    row = get_store().select("audit_log", limit=1)[0]
+    with pytest.raises(PermissionError):
+        get_store().update("audit_log", row["id"], {"event_type": "x"})

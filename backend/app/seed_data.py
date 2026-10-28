@@ -27,6 +27,8 @@ USERS = [
     {"key": "creator", "email": "creator@demo.test", "role": "creator", "full_name": "Chirag Creator"},
     {"key": "manager", "email": "manager@demo.test", "role": "manager", "full_name": "Meera Manager"},
     {"key": "reviewer", "email": "reviewer@demo.test", "role": "reviewer", "full_name": "Rohan Reviewer"},
+    # Owns the seeded historical content so the demo creator starts with a clean slate. Not shown on the login page.
+    {"key": "history", "email": "history@demo.test", "role": "creator", "full_name": "Priya (past campaigns)"},
 ]
 for _u in USERS:
     _u["id"] = _id("user-" + _u["key"])
@@ -180,3 +182,91 @@ def seed_memory_store(store) -> None:
         for i, c in enumerate(chunk_text(row["body"])):
             store.insert("source_chunks", {"source_id": row["id"], "org_id": ORG_ID, "content": c,
                                            "chunk_index": i, "embedding": None, "metadata": {"code": row["code"]}})
+
+
+# ---------------------------------------------------------------------------
+# Historical data so Insights is never empty (everything flagged seeded=true)
+# ---------------------------------------------------------------------------
+
+# rule_id -> (category, layer, severity, weight, reject_rate, low_confidence)
+HISTORY_RULES = {
+    "RULE-ABS-001": ("claim", "A", "high", 22, 0.10, False),
+    "RULE-TERM-001": ("terminology", "A", "medium", 14, 0.10, False),
+    "RULE-MED-001": ("claim", "A", "high", 8, 0.05, False),
+    "RULE-SUP-001": ("claim", "A", "high", 7, 0.15, False),
+    "RULE-DISC-INFL-001": ("disclosure", "A", "high", 7, 0.0, False),
+    "RULE-A11Y-ALT-001": ("accessibility", "A", "medium", 6, 0.1, False),
+    "RULE-VIS-CONTRAST-001": ("accessibility", "A", "high", 4, 0.0, False),
+    "RULE-TONE-HYPE": ("tone", "B", "low", 9, 0.67, False),
+    "RULE-CLAIM-UNSUPPORTED": ("claim", "B", "medium", 6, 0.2, True),
+    "RULE-CLAIM-FACT": ("claim", "B", "high", 4, 0.0, False),
+}
+HISTORY_STATUSES = ["approved"] * 9 + ["pending_manager"] * 3 + ["escalated"] * 2 + ["changes_requested"] * 4 + \
+                   ["rejected"] * 2 + ["checked"] * 3 + ["draft"] * 2
+
+
+def seed_history(store, org_id: str, creator_id: str, manager_id: str, reviewer_id: str, now: datetime = None) -> None:
+    rnd = random.Random(42)
+    now = now or datetime.now(timezone.utc)
+    rule_ids = list(HISTORY_RULES)
+    weights = [HISTORY_RULES[r][3] for r in rule_ids]
+    channels = ["instagram_post", "website_page", "influencer_post", "press_release", "email"]
+    items, versions, runs, findings, approvals, audits = [], [], [], [], [], []
+    total_target = 80
+    per_item = [3] * 25
+    for i in range(total_target - sum(per_item)):
+        per_item[i % 25] += 1
+    for n in range(25):
+        created = now - timedelta(days=29 - n * 29 / 24, hours=rnd.randint(0, 6))
+        iso = created.isoformat()
+        status = HISTORY_STATUSES[n % len(HISTORY_STATUSES)]
+        cid, vid, rid = _id(f"hist-c{n}"), _id(f"hist-v{n}"), _id(f"hist-r{n}")
+        items.append({"id": cid, "org_id": org_id, "title": f"Past campaign {n + 1}", "status": status,
+                      "creator_id": creator_id, "channel": rnd.choice(channels), "ai_generated": n % 7 == 0,
+                      "current_version": 1, "created_at": iso, "updated_at": iso})
+        versions.append({"id": vid, "content_item_id": cid, "org_id": org_id, "version_number": 1, "file_type": "text/plain",
+                         "raw_text": "(historical sample)", "alt_text": "", "note": "Seeded history", "created_by": creator_id,
+                         "created_at": iso})
+        runs.append({"id": rid, "org_id": org_id, "content_item_id": cid, "content_version_id": vid, "version_number": 1,
+                     "layer_a_ms": 4, "layer_b_ms": 900, "used_fallback": False, "model": "seeded", "created_at": iso})
+        audits.append({"org_id": org_id, "actor_id": creator_id, "event_type": "review_run", "target_type": "content_item",
+                       "target_id": cid, "details": {"seeded": True, "findings": per_item[n]}, "created_at": iso})
+        for k in range(per_item[n]):
+            rule = rnd.choices(rule_ids, weights)[0]
+            cat, layer, sev, _, rej, low = HISTORY_RULES[rule]
+            decided = status not in ("draft", "checked") or rnd.random() < 0.7
+            r = rnd.random()
+            st = "open" if not decided else ("rejected" if r < rej else rnd.choice(["accepted", "accepted", "edited"]))
+            fid = _id(f"hist-f{n}-{k}")
+            findings.append({
+                "id": fid, "content_version_id": vid, "org_id": org_id, "run_id": rid, "layer": layer, "category": cat,
+                "rule_id": rule, "source_ids": [], "source_codes": [], "span": None, "region": None, "span_text": None,
+                "issue": f"Seeded finding for {rule}", "why_flagged": "Seeded historical example.",
+                "suggested_fix": "n/a", "severity": sev, "confidence": "low" if low else ("high" if layer == "A" else "medium"),
+                "status": st, "decided_by": creator_id if st != "open" else None,
+                "decision_reason": "Not applicable here" if st == "rejected" else None,
+                "decided_at": iso if st != "open" else None, "created_at": iso})
+            if st != "open":
+                audits.append({"org_id": org_id, "actor_id": creator_id, "event_type": "finding_decided",
+                               "target_type": "finding", "target_id": fid,
+                               "details": {"seeded": True, "decision": st, "rule_id": rule}, "created_at": iso})
+        if status in ("pending_manager", "escalated", "approved", "changes_requested", "rejected"):
+            approvals.append({"org_id": org_id, "content_item_id": cid, "version_number": 1, "actor_id": creator_id,
+                              "role": "creator", "action": "submit", "reason": None, "override": False, "created_at": iso})
+            audits.append({"org_id": org_id, "actor_id": creator_id, "event_type": "workflow_submit", "target_type": "content_item",
+                           "target_id": cid, "details": {"seeded": True, "to": "pending_manager"}, "created_at": iso})
+        if status == "approved":
+            approvals.append({"org_id": org_id, "content_item_id": cid, "version_number": 1, "actor_id": manager_id,
+                              "role": "manager", "action": "approve", "reason": None, "override": n % 4 == 0, "created_at": iso})
+    for table, rows in [("content_items", items), ("content_versions", versions), ("review_runs", runs),
+                        ("findings", findings), ("approvals", approvals), ("audit_log", audits)]:
+        store.insert_many(table, rows)
+
+
+_orig_seed = seed_memory_store
+
+
+def seed_memory_store(store) -> None:  # noqa: F811 - extends the base seeding with history
+    _orig_seed(store)
+    u = {x["key"]: x["id"] for x in USERS}
+    seed_history(store, ORG_ID, u["history"], u["manager"], u["reviewer"])
