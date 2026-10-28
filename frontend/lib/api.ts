@@ -4,7 +4,8 @@ import type {
   ReviewResult, RuleInfo, Sample, Source, UnclearRule, WorkflowAction,
 } from "@/lib/types";
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Tolerate trailing slashes or stray punctuation in the env var (a "//api/..." path 404s on the server)
+export const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").trim().replace(/[/.\s]+$/, "");
 const DEMO_KEY = "bg_demo_session";
 
 export interface DemoSession {
