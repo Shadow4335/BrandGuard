@@ -5,7 +5,7 @@
 | Service | Purpose | Data it receives |
 |---|---|---|
 | Google Gemini API (default `LLM_PROVIDER=gemini`, model from `LLM_MODEL`, e.g. `gemini-2.5-flash`) | Layer B: tone and claim-vs-fact review, rewrite suggestions | The content text under review and the retrieved brand-source excerpts, per review. Only when `LLM_API_KEY` is set and `MOCK_LLM=false` |
-| Gemini embeddings (`text-embedding-004`, 768 dims) | Retrieval of relevant source chunks | Source chunks (when sources are added) and sentences of the content under review |
+| Gemini embeddings (`gemini-embedding-001`, 768 dims) | Retrieval of relevant source chunks | Source chunks (when sources are added) and sentences of the content under review |
 | Anthropic / OpenAI (optional adapters, `LLM_PROVIDER=anthropic\|openai`) | Alternative LLM providers | Same as Gemini |
 | Supabase (Postgres, Auth, Storage, pgvector) | Data, sign-in, private files, vector search | All application data |
 | Vercel | Hosts the Next.js frontend | Static assets, page requests |

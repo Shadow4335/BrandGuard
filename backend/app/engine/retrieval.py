@@ -45,13 +45,7 @@ def retrieve(org_id: str, text: str, k: int = 6) -> List[RetrievedSource]:
         if s["source_type"] == "guideline":
             chosen[s["id"]] = 1.0
     sentences = split_sentences(text) or [text]
-    vecs = embed_texts(sentences)
-    if vecs:
-        for v in vecs:
-            for row in store.match_chunks(org_id, ["claim_library"], v, k):
-                if row["source_id"] in sources:
-                    chosen[row["source_id"]] = max(chosen.get(row["source_id"], 0), row.get("similarity", 0.5))
-    else:  # keyword fallback
+    def keyword() -> None:
         for sent in sentences:
             st = tokens(sent)
             scored = []
@@ -63,5 +57,17 @@ def retrieve(org_id: str, text: str, k: int = 6) -> List[RetrievedSource]:
                     scored.append((overlap, s["id"]))
             for overlap, sid in sorted(scored, reverse=True)[:k]:
                 chosen[sid] = max(chosen.get(sid, 0), overlap)
+
+    vecs = embed_texts(sentences)
+    if vecs:
+        try:
+            for v in vecs:
+                for row in store.match_chunks(org_id, ["claim_library"], v, k):
+                    if row["source_id"] in sources:
+                        chosen[row["source_id"]] = max(chosen.get(row["source_id"], 0), row.get("similarity", 0.5))
+        except Exception:
+            pass  # vector search failed: keyword search below still runs
+    if not any(sources[i]["source_type"] == "claim_library" for i in chosen):
+        keyword()  # no embeddings yet, or nothing close enough: never leave the AI without facts
     return [RetrievedSource(id=i, code=sources[i]["code"], kind=sources[i]["source_type"], text=sources[i]["body"] or "")
             for i in chosen]

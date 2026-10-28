@@ -54,6 +54,17 @@ def main() -> None:
             store.put_file("sources", f"{ORG_ID}/glowleaf-logo.png", make_logo_png(), "image/png")
     print(f"sources ready ({len(source_rows())})")
 
+    # Backfill embeddings for chunks seeded before an LLM key was configured
+    missing = [c for c in store.select("source_chunks", {"org_id": ORG_ID}) if c.get("embedding") is None]
+    if missing:
+        vecs = embed_texts([c["content"] for c in missing])
+        if vecs:
+            for c, v in zip(missing, vecs):
+                store.update("source_chunks", c["id"], {"embedding": v})
+            print(f"embedded {len(missing)} source chunks")
+        else:
+            print(f"{len(missing)} chunks have no embeddings (no live LLM key); keyword retrieval will be used")
+
     if not store.get("content_items", _id("hist-c0")):
         seed_history(store, ORG_ID, ids["history"], ids["manager"], ids["reviewer"])
         print("seeded 25 historical content items")

@@ -25,7 +25,7 @@ class Settings(BaseModel):
     llm_provider: str = os.getenv("LLM_PROVIDER", "gemini")
     llm_api_key: str = os.getenv("LLM_API_KEY", "")
     llm_model: str = os.getenv("LLM_MODEL", "gemini-2.5-flash")
-    embed_model: str = os.getenv("EMBED_MODEL", "text-embedding-004")
+    embed_model: str = os.getenv("EMBED_MODEL", "gemini-embedding-001")
     embed_dim: int = int(os.getenv("EMBED_DIM", "768"))
     supabase_url: str = os.getenv("SUPABASE_URL", "")
     supabase_anon_key: str = os.getenv("SUPABASE_ANON_KEY", "")
