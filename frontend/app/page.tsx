@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { API_BASE } from "@/lib/api";
 import {
   ShieldCheck,
   CheckCircle2,
@@ -19,8 +20,9 @@ import {
 interface HealthData {
   status: string;
   service: string;
-  mock_llm?: boolean;
-  llm_provider?: string;
+  ai_provider?: string;
+  ai_live?: boolean;
+  store?: string;
 }
 
 export default function HomePage() {
@@ -32,10 +34,9 @@ export default function HomePage() {
   const fetchHealth = async () => {
     setHealthStatus("loading");
     const startTime = performance.now();
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
     try {
-      const res = await fetch(`${apiUrl}/health`, {
+      // First request can take up to a minute if the free-tier API was asleep
+      const res = await fetch(`${API_BASE}/api/health`, {
         cache: "no-store",
       });
       const latency = Math.round(performance.now() - startTime);
@@ -134,7 +135,7 @@ export default function HomePage() {
                 Backend System Status
               </h2>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Verified against FastAPI service at <code className="font-mono text-zinc-700 dark:text-zinc-300">GET /health</code> (Port 8000)
+                Checks the BrandGuard API at <code className="font-mono text-zinc-700 dark:text-zinc-300">GET /api/health</code>
               </p>
             </div>
           </div>
@@ -168,7 +169,7 @@ export default function HomePage() {
             ) : (
               <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm">
                 <XCircle className="w-4 h-4" />
-                <span>Backend offline (Ensure FastAPI is running on port 8000)</span>
+                <span>Can't reach the BrandGuard server. It may be waking up (the free tier sleeps when idle); wait a few seconds and press refresh.</span>
               </div>
             )}
           </div>
@@ -176,7 +177,7 @@ export default function HomePage() {
           {health && (
             <div className="flex items-center gap-4 text-xs text-zinc-600 dark:text-zinc-400 font-mono">
               <span>Service: <strong className="text-zinc-900 dark:text-zinc-200">{health.service}</strong></span>
-              <span>Provider: <strong className="text-zinc-900 dark:text-zinc-200">{health.llm_provider}</strong></span>
+              <span>AI: <strong className="text-zinc-900 dark:text-zinc-200">{health.ai_live ? health.ai_provider : "offline fallback"}</strong></span>
               {healthLatency !== null && (
                 <span>Latency: <strong className="text-zinc-900 dark:text-zinc-200">{healthLatency}ms</strong></span>
               )}
