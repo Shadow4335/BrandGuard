@@ -14,6 +14,8 @@ class HealthOut(BaseModel):
     ai_live: bool
     fallback_available: bool = True
     store: str
+    version: str = ""
+    commit: str = ""
 
 
 class DemoLoginIn(BaseModel):

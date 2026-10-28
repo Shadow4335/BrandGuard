@@ -1,4 +1,6 @@
 """Health, demo login and 'who am I' endpoints."""
+import os
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth import UserContext, get_current_user
@@ -13,7 +15,8 @@ router = APIRouter(prefix="/api", tags=["Core"])
 def health():
     s = get_settings()
     return HealthOut(ai_provider=s.llm_provider if s.llm_available else "mock (rule-based fallback)",
-                     ai_live=s.llm_available, store="supabase" if s.use_supabase else "memory")
+                     ai_live=s.llm_available, store="supabase" if s.use_supabase else "memory",
+                     version=s.app_version, commit=os.getenv("RENDER_GIT_COMMIT", "local")[:7])
 
 
 @router.get("/me")

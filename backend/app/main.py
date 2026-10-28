@@ -22,6 +22,13 @@ app.add_middleware(
 )
 
 
+@app.on_event("startup")
+def announce() -> None:
+    import os
+    print(f"BrandGuard API {settings.app_version} commit={os.getenv('RENDER_GIT_COMMIT', 'local')[:7]} "
+          f"store={'supabase' if settings.use_supabase else 'memory'} ai_live={settings.llm_available}", flush=True)
+
+
 @app.exception_handler(Exception)
 async def friendly_errors(request: Request, exc: Exception):
     """Never leak a stack trace to the UI."""
