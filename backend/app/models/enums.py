@@ -52,9 +52,26 @@ class FindingStatus(str, Enum):
     REJECTED = "rejected"
 
 
+class Channel(str, Enum):
+    INSTAGRAM_POST = "instagram_post"
+    WEBSITE_PAGE = "website_page"
+    INFLUENCER_POST = "influencer_post"
+    PRESS_RELEASE = "press_release"
+    EMAIL = "email"
+
+
+class WorkflowAction(str, Enum):
+    SUBMIT = "submit"
+    APPROVE = "approve"
+    REQUEST_CHANGES = "request_changes"
+    ESCALATE = "escalate"
+    REJECT = "reject"
+
+
 class SourceType(str, Enum):
     GUIDELINE = "guideline"
-    CLAIM_LIBRARY = "claim_library"
+    TERMINOLOGY = "terminology"
+    CLAIM_LIBRARY = "claim_library"  # approved facts
     REGULATORY = "regulatory"
     ASSET = "asset"
     OTHER = "other"

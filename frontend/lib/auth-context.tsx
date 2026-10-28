@@ -4,6 +4,21 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase";
 import { Profile, UserRole } from "@/lib/types";
+import { api, getDemoSession, setDemoSession, DemoSession } from "@/lib/api";
+
+const DEMO_ROLES: Record<string, UserRole> = {
+  "admin@demo.test": "admin",
+  "creator@demo.test": "creator",
+  "manager@demo.test": "manager",
+  "reviewer@demo.test": "reviewer",
+};
+
+function demoToState(d: DemoSession): { user: User; profile: Profile } {
+  return {
+    user: { id: d.user_id, email: d.email } as User,
+    profile: { id: d.user_id, org_id: d.org_id, role: d.role as UserRole, email: d.email, full_name: d.full_name },
+  };
+}
 
 interface AuthContextType {
   user: User | null;
@@ -64,6 +79,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     async function initAuth() {
       try {
+        const demo = getDemoSession();
+        if (demo) {
+          const st = demoToState(demo);
+          if (mounted) { setUser(st.user); setProfile(st.profile); }
+          return;
+        }
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user && mounted) {
           setUser(session.user);
@@ -102,6 +123,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     setLoading(true);
     try {
+      // Offline demo mode (no Supabase configured on the server): one-click token login
+      const role = DEMO_ROLES[email];
+      if (role) {
+        try {
+          const health = await api.health();
+          if (health.store === "memory") {
+            const d = await api.demoLogin(role);
+            setDemoSession(d);
+            const st = demoToState(d);
+            setUser(st.user); setProfile(st.profile); setLoading(false);
+            return true;
+          }
+        } catch { /* fall through to Supabase sign-in */ }
+      }
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -130,6 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     setLoading(true);
     try {
+      setDemoSession(null);
       await supabase.auth.signOut();
       setUser(null);
       setProfile(null);

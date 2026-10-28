@@ -28,6 +28,8 @@ class Source(BaseModel):
     org_id: UUID
     title: str
     source_type: SourceType = SourceType.GUIDELINE
+    code: Optional[str] = None  # human-readable citation id, e.g. GUIDE-TONE-01
+    body: Optional[str] = None
     file_path: Optional[str] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
     created_at: Optional[datetime] = None
@@ -66,6 +68,9 @@ class ContentItem(BaseModel):
     title: str
     status: ContentStatus = ContentStatus.DRAFT
     creator_id: Optional[UUID] = None
+    channel: str = "instagram_post"
+    ai_generated: bool = False
+    current_version: int = 1
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -78,6 +83,8 @@ class ContentVersion(BaseModel):
     file_type: str = "text/plain"  # text/plain, application/pdf, docx, image/png
     raw_text: Optional[str] = None
     file_path: Optional[str] = None
+    alt_text: Optional[str] = None
+    note: Optional[str] = None
     created_by: Optional[UUID] = None
     created_at: Optional[datetime] = None
 
@@ -100,4 +107,30 @@ class AuditEntry(BaseModel):
     target_type: str  # finding, content_item, content_version, rule, source
     target_id: Optional[UUID] = None
     details: Dict[str, Any] = Field(default_factory=dict)
+    created_at: Optional[datetime] = None
+
+
+class ReviewRun(BaseModel):
+    id: UUID = Field(default_factory=uuid4)
+    org_id: UUID
+    content_item_id: UUID
+    content_version_id: UUID
+    version_number: int
+    layer_a_ms: int = 0
+    layer_b_ms: int = 0
+    used_fallback: bool = False
+    model: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+
+class Approval(BaseModel):
+    id: UUID = Field(default_factory=uuid4)
+    org_id: UUID
+    content_item_id: UUID
+    version_number: int
+    actor_id: UUID
+    role: str
+    action: str
+    reason: Optional[str] = None
+    override: bool = False
     created_at: Optional[datetime] = None

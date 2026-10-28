@@ -31,9 +31,12 @@ class Finding(BaseModel):
     org_id: UUID
     layer: FindingLayer
     category: FindingCategory
-    rule_id: Optional[UUID] = None
+    run_id: Optional[UUID] = None
+    rule_id: Optional[str] = None  # YAML rule id, e.g. RULE-ABS-001
     source_ids: Optional[List[UUID]] = Field(default_factory=list)
+    source_codes: List[str] = Field(default_factory=list)  # citations shown to users, e.g. FACT-003
     span: Optional[TextSpan] = None
+    span_text: Optional[str] = None
     region: Optional[VisualRegion] = None
     issue: str
     why_flagged: str
@@ -43,14 +46,16 @@ class Finding(BaseModel):
     status: FindingStatus = FindingStatus.OPEN
     decided_by: Optional[UUID] = None
     decision_reason: Optional[str] = None
+    decision_text: Optional[str] = None  # final text when status == edited
+    decided_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
 
     @model_validator(mode="after")
     def validate_grounding_and_decisions(self) -> "Finding":
         # Hard Rule 6: Overrides/rejections require a decision reason
-        if self.status in (FindingStatus.EDITED, FindingStatus.REJECTED) and self.decided_by:
+        if self.status == FindingStatus.REJECTED and self.decided_by:
             if not self.decision_reason or not self.decision_reason.strip():
-                raise ValueError("A written decision reason is required when editing or rejecting a finding")
+                raise ValueError("A written decision reason is required when rejecting a finding")
 
         # Layer B grounding rule: If category is claim with no sources, ensure proper issue description
         if self.layer == FindingLayer.B and self.category == FindingCategory.CLAIM:

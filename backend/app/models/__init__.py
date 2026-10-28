@@ -1,15 +1,19 @@
 from app.models.domain import (
+    Approval,
     AuditEntry,
     Comment,
     ContentItem,
     ContentVersion,
     Organisation,
     Profile,
+    ReviewRun,
     Rule,
     Source,
     SourceChunk,
 )
 from app.models.enums import (
+    Channel,
+    WorkflowAction,
     ContentStatus,
     FindingCategory,
     FindingConfidence,
@@ -22,6 +26,10 @@ from app.models.enums import (
 from app.models.finding import Finding, TextSpan, VisualRegion
 
 __all__ = [
+    "Approval",
+    "ReviewRun",
+    "Channel",
+    "WorkflowAction",
     "UserRole",
     "ContentStatus",
     "FindingLayer",
