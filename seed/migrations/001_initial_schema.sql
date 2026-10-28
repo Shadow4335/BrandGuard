@@ -246,7 +246,7 @@ create policy "audit_log_same_org_insert" on public.audit_log
 -- 17. Vector Similarity Search Function (RPC)
 create or replace function public.match_chunks(
     query_embedding vector(768),
-    org_id uuid,
+    p_org_id uuid,
     source_types text[] default null,
     k int default 5
 )
@@ -272,7 +272,7 @@ begin
         (1 - (sc.embedding <=> query_embedding))::float as similarity
     from public.source_chunks sc
     join public.sources s on s.id = sc.source_id
-    where sc.org_id = match_chunks.org_id
+    where sc.org_id = p_org_id
       and (
           match_chunks.source_types is null
           or cardinality(match_chunks.source_types) = 0

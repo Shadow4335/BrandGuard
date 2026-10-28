@@ -111,7 +111,7 @@ class SupabaseStore(Store):
             return None
 
     def match_chunks(self, org_id, source_types, query_embedding, k):
-        res = self.client.rpc("match_chunks", {"query_embedding": query_embedding, "org_id": org_id,
+        res = self.client.rpc("match_chunks", {"query_embedding": query_embedding, "p_org_id": org_id,
                                                "source_types": source_types, "k": k}).execute()
         return res.data or []
 
