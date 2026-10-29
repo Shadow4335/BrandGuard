@@ -15,7 +15,7 @@ Layout note: the repo's own rules (GEMINI.md) took precedence over BUILD_WORKFLO
 | Live check | Passed | Real Supabase Auth login for all roles, live Gemini review, pgvector retrieval, the full submit/escalate/override-approve flow, creator blocked (403) from adding sources, and the DB trigger blocks `audit_log` updates. Run once via a script on localhost |
 | 4B Review queue and approvals | Passed (offline demo mode, in-app browser) | Creator submit, Manager comment and escalate, Reviewer override approval with reason; audit entries visible |
 | 5 Insights | Passed | Seeded charts render; `RULE-TONE-HYPE` (62% overridden) and `RULE-CLAIM-UNSUPPORTED` appear under "may be unclear" |
-| 6 Deploy | Passed | Vercel + Render + Supabase live; Golden Path steps 1-10 walked through by Claude on the deployed link (real Supabase login, live Gemini review, decisions, v2 diff, submit, manager escalate, reviewer override approval, audit, Insights). Stranger test completed by a first-time user (reported by the project owner). Repository is public. Not yet done: the backup demo video |
+| 6 Deploy | Passed | Vercel + Render + Supabase live; Golden Path steps 1-10 walked through by Claude on the deployed link (real Supabase login, live Gemini review, decisions, v2 diff, submit, manager escalate, reviewer override approval, audit, Insights). Stranger test completed by a first-time user (reported by the project owner). Repository is public. Backup demo video and Round 2 PDF: [Google Drive](https://drive.google.com/drive/folders/1lYTpx39wpcZCzE3xBsDXBks_W1Axockj?usp=sharing) |
 
 Test suite: `cd backend && python -m pytest -q` (38 tests, offline).
 

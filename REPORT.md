@@ -2,7 +2,7 @@
 
 **Pre-publication brand governance. AI suggests, humans decide. Nothing is ever auto-edited or auto-published.**
 
-Live app: https://brand-guard-lovat.vercel.app · API: https://brandguard-api-74et.onrender.com · Repo: github.com/Shadow4335/BrandGuard
+Live app: https://brand-guard-lovat.vercel.app · Demo video and Round 2 PDF: https://drive.google.com/drive/folders/1lYTpx39wpcZCzE3xBsDXBks_W1Axockj?usp=sharing · API: https://brandguard-api-74et.onrender.com · Repo: github.com/Shadow4335/BrandGuard
 
 ---
 
@@ -155,7 +155,7 @@ A role switcher in the top bar changes role in one click. The dashboard shows a 
 - The free Render tier sleeps after about 15 minutes idle, so the first request can take up to a minute. Live reviews take roughly 20 seconds.
 - Row-level security and storage policies were not exercised directly, because the API uses the service role and enforces roles and organisations in code.
 - Skipped as lower priority: logo and palette checks, messaging-similarity scoring, an admin rule-editor screen (rules are YAML with a read-only viewer), and email notifications.
-- Still to do: the backup demo video. (The stranger test is done and the repository is public.)
+- All deliverables are done: live app, public repository, stranger test, and the [demo video and Round 2 PDF](https://drive.google.com/drive/folders/1lYTpx39wpcZCzE3xBsDXBks_W1Axockj?usp=sharing).
 
 ## 11. Where things are
 
