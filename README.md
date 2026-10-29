@@ -59,6 +59,7 @@ Tests (offline, no keys): `cd backend && python -m pytest -q`.
 | `SUPABASE_ANON_KEY` | backend + frontend | public client key |
 | `LLM_PROVIDER`, `LLM_MODEL`, `LLM_API_KEY`, `MOCK_LLM` | backend only | AI layer; unset key = offline fallback |
 | `LLM_FALLBACK_MODEL` | backend only | second Gemini model used when the main one is overloaded or out of quota (default `gemini-flash-lite-latest`) |
+| `LLM_BACKUP_PROVIDER`, `LLM_BACKUP_API_KEY`, `LLM_BACKUP_MODEL` | backend only | optional second provider (`anthropic`, `openai` or another `gemini` key) tried when Gemini fails |
 | `SIGNUP_ORG_ID` | backend only | optional: workspace new sign-ups join (defaults to the GlowLeaf demo org) |
 | `EMBED_MODEL`, `EMBED_DIM` | backend | embeddings (768) |
 | `ALLOWED_ORIGINS` | backend | CORS (add the Vercel URL) |

@@ -26,8 +26,9 @@ _signups: dict = defaultdict(deque)
 @router.get("/health", response_model=HealthOut)
 def health():
     s = get_settings()
-    return HealthOut(ai_provider=s.llm_provider if s.llm_available else "mock (rule-based fallback)",
-                     ai_live=s.llm_available, store="supabase" if s.use_supabase else "memory",
+    return HealthOut(ai_provider=(s.llm_provider if s.llm_api_key else s.llm_backup_provider) if s.llm_available
+                     else "mock (rule-based fallback)",
+                     ai_live=s.llm_available, ai_backup=s.llm_backup_provider if s.llm_backup_ready else "", store="supabase" if s.use_supabase else "memory",
                      version=s.app_version, commit=os.getenv("RENDER_GIT_COMMIT", "local")[:7])
 
 

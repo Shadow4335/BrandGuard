@@ -12,6 +12,7 @@ class HealthOut(BaseModel):
     service: str = "brandguard-api"
     ai_provider: str
     ai_live: bool
+    ai_backup: str = ""  # backup provider name, empty if none
     fallback_available: bool = True
     store: str
     version: str = ""

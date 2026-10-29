@@ -26,6 +26,12 @@ class Settings(BaseModel):
     llm_api_key: str = os.getenv("LLM_API_KEY", "")
     llm_model: str = os.getenv("LLM_MODEL", "gemini-2.5-flash")
     llm_fallback_model: str = os.getenv("LLM_FALLBACK_MODEL", "gemini-flash-lite-latest")  # used when the main model is overloaded
+    # Optional second provider with its own key, tried after the main provider fails
+    llm_backup_provider: str = os.getenv("LLM_BACKUP_PROVIDER", "").strip().lower()
+    llm_backup_api_key: str = os.getenv("LLM_BACKUP_API_KEY", "").strip()
+    llm_backup_model: str = os.getenv("LLM_BACKUP_MODEL", "").strip() or {
+        "anthropic": "claude-haiku-5-5", "gemini": "gemini-flash-lite-latest"}.get(
+        os.getenv("LLM_BACKUP_PROVIDER", "").strip().lower(), "")
     embed_model: str = os.getenv("EMBED_MODEL", "gemini-embedding-001")
     embed_dim: int = int(os.getenv("EMBED_DIM", "768"))
     supabase_url: str = os.getenv("SUPABASE_URL", "")
@@ -43,7 +49,12 @@ class Settings(BaseModel):
 
     @property
     def llm_available(self) -> bool:
-        return (not self.mock_llm) and bool(self.llm_api_key)
+        return (not self.mock_llm) and bool(self.llm_api_key or self.llm_backup_ready)
+
+    @property
+    def llm_backup_ready(self) -> bool:
+        return bool(self.llm_backup_provider in ("gemini", "anthropic", "openai")
+                    and self.llm_backup_api_key and self.llm_backup_model)
 
 
 @lru_cache()

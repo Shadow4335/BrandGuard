@@ -29,7 +29,7 @@ Test suite: `cd backend && python -m pytest -q` (38 tests, offline).
 
 ## Known limitations
 - The API uses the Supabase service role, so RLS and storage policies were not exercised directly (API-level role and org checks were).
-- The Gemini key is on the free tier: `gemini-2.5-flash` hit its daily quota (429) during testing. Quota errors now skip straight to `LLM_FALLBACK_MODEL` (`gemini-flash-lite-latest`, verified working); overload (503) retries once first. Only if both fail does the review use offline checks, then falls back to offline checks with a visible notice. Live reviews take roughly 20 seconds. Which findings the model raises varies run to run (for example "100% natural" may be labelled Unsupported rather than contradicting FACT-001).
+- The Gemini key is on the free tier: `gemini-2.5-flash` hit its daily quota (429) during testing. Quota errors now skip straight to `LLM_FALLBACK_MODEL` (`gemini-flash-lite-latest`, verified working); overload (503) retries once first. An optional backup provider with its own key (`LLM_BACKUP_*`, Anthropic or OpenAI) is tried next. Only if all of these fail does the review use offline checks. The chain is unit-tested with fake providers; whether the backup works live depends on the key configured, then falls back to offline checks with a visible notice. Live reviews take roughly 20 seconds. Which findings the model raises varies run to run (for example "100% natural" may be labelled Unsupported rather than contradicting FACT-001).
 - Free-tier Render sleeps after ~15 minutes idle; the first request can take up to a minute.
 - The version diff viewer loads lazily and can take a few seconds the first time.
 - Findings re-order after a decision is made (decided cards move down).

@@ -323,6 +323,7 @@ export interface Health {
   status: string;
   ai_provider: string;
   ai_live: boolean;
+  ai_backup?: string;
   fallback_available: boolean;
   store: "supabase" | "memory";
 }

@@ -7,7 +7,7 @@ from app.config import get_settings
 
 def embed_texts(texts: List[str]) -> Optional[List[List[float]]]:
     s = get_settings()
-    if not s.llm_available or not texts:
+    if s.mock_llm or not s.llm_api_key or not texts:  # embeddings use the main (Gemini) key only
         return None
     try:
         if s.llm_provider == "gemini":
