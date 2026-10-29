@@ -25,7 +25,7 @@ Test suite: `cd backend && python -m pytest -q` (38 tests, offline).
 |---|---|
 | PDF (text), scanned PDF (OCR), DOCX (with alt-text check on pictures), PNG/JPG/WEBP/GIF (OCR, contrast, alt-text), TXT/Markdown (UTF-8 and UTF-16), HTML (`<img>` alt) | Tested offline (`tests/test_uploads.py`), against real Supabase storage, and on the live Render API (PDF, scanned PDF, DOCX, JPG, PNG, TXT, HTML created; images and scanned PDF reviewed with live Gemini; three clean repeat runs with health checks answering throughout) |
 | Corrupt, empty, oversized (>10 MB), `.doc`, HEIC, `.pptx`, `.zip` | Friendly 4xx message, no crash (tested) |
-| Sign-up with a chosen role, sign-in, wrong password, duplicate email, validation, rate limit (5 per IP per 10 min) | Tested offline and through the UI on a local offline build. **Supabase sign-up path not exercised by Claude** (no real accounts were created on the live site); it uses the same admin API as the seed script, which worked |
+| Sign-up with a chosen role, sign-in, wrong password, duplicate email, validation, rate limit (5 per IP per 10 min) | Tested offline and through the UI on a local offline build; **confirmed working on the live site** by the project owner with a new account |
 
 ## Known limitations
 - The API uses the Supabase service role, so RLS and storage policies were not exercised directly (API-level role and org checks were).
