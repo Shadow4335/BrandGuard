@@ -2,15 +2,14 @@ FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PORT=8000
+    PORT=8000 \
+    OMP_THREAD_LIMIT=1
 
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     tesseract-ocr-eng \
-    libmupdf-dev \
-    gcc \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
