@@ -155,7 +155,7 @@ A role switcher in the top bar changes role in one click. The dashboard shows a 
 - The free Render tier sleeps after about 15 minutes idle, so the first request can take up to a minute. Live reviews take roughly 20 seconds.
 - Row-level security and storage policies were not exercised directly, because the API uses the service role and enforces roles and organisations in code.
 - Skipped as lower priority: logo and palette checks, messaging-similarity scoring, an admin rule-editor screen (rules are YAML with a read-only viewer), and email notifications.
-- Still to do: a stranger test with a real first-time user, the backup demo video, and confirming the repository is public.
+- Still to do: the backup demo video. (The stranger test is done and the repository is public.)
 
 ## 11. Where things are
 
