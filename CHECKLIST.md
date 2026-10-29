@@ -23,7 +23,7 @@ Test suite: `cd backend && python -m pytest -q` (38 tests, offline).
 
 | Check | Status |
 |---|---|
-| PDF (text), scanned PDF (OCR), DOCX (with alt-text check on pictures), PNG/JPG/WEBP/GIF (OCR, contrast, alt-text), TXT/Markdown (UTF-8 and UTF-16), HTML (`<img>` alt) | Tested offline (`tests/test_uploads.py`) and against real Supabase storage from localhost |
+| PDF (text), scanned PDF (OCR), DOCX (with alt-text check on pictures), PNG/JPG/WEBP/GIF (OCR, contrast, alt-text), TXT/Markdown (UTF-8 and UTF-16), HTML (`<img>` alt) | Tested offline (`tests/test_uploads.py`), against real Supabase storage, and on the live Render API (PDF, scanned PDF, DOCX, JPG, PNG, TXT, HTML created; images and scanned PDF reviewed with live Gemini; three clean repeat runs with health checks answering throughout) |
 | Corrupt, empty, oversized (>10 MB), `.doc`, HEIC, `.pptx`, `.zip` | Friendly 4xx message, no crash (tested) |
 | Sign-up with a chosen role, sign-in, wrong password, duplicate email, validation, rate limit (5 per IP per 10 min) | Tested offline and through the UI on a local offline build. **Supabase sign-up path not exercised by Claude** (no real accounts were created on the live site); it uses the same admin API as the seed script, which worked |
 
@@ -42,4 +42,6 @@ Test suite: `cd backend && python -m pytest -q` (38 tests, offline).
 - No Lighthouse accessibility run; contrast and keyboard focus were handled by design but not measured. Light theme only.
 - Not done: step 12 of the Golden Path on a deployed environment (covered by an automated offline test instead).
 - Sign-ups join the shared demo workspace and can pick any role, including Admin, which can add brand sources (nothing can be deleted through the app). This trades isolation for letting judges try every role.
-- Scanned PDFs: OCR covers the first 5 pages. Images are OCR'd at most 2500 px on the long side.
+- Scanned PDFs: OCR covers the first 5 pages. Images are OCR'd at most 2500 px on the long side, with a 30 s OCR time limit.
+- Server memory on the 512 MB Render instance: PyMuPDF is pinned to 1.26 because 2.x loads onnxruntime (~190 MB) and crashed the instance during OCR. Peak is now about 175 MB plus about 45 MB for Tesseract.
+- Image reviews take 5 to 30 seconds on the live server, depending mostly on Gemini latency.

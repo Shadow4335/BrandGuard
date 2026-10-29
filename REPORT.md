@@ -39,9 +39,11 @@ The demo organisation is **GlowLeaf Naturals**, a fictional Indian personal-care
 | **Creator** | Create content, run the review, accept/edit/reject suggestions, save versions, submit for review, comment |
 | **Brand Manager** | See the review queue, comment, **Approve / Request changes / Escalate** |
 | **Authorised Reviewer** | Handle escalated items: **Approve / Reject**. Approving with unresolved high-severity findings requires a written override reason |
-| **Admin** | Manage brand sources, view rules and Insights |
+| **Admin** | Manage brand sources (typed or uploaded as files), view rules and Insights |
 
 Roles are enforced in the backend (every endpoint checks the role) and in the database for sources. The UI hides forbidden actions but is never the only guard.
+
+**Accounts:** judges can use the one-click demo accounts or **sign up** with their own email, name, password and chosen role. Sign-up creates a confirmed account straight away (no email step) in the shared GlowLeaf Naturals demo workspace, so brand sources and history are already there.
 
 ## 4. How a piece of content flows through the system
 
@@ -60,7 +62,7 @@ Creator submits ──► Review runs ──► Creator decides on each finding 
 
 ### Step by step
 
-1. **Submit.** The creator picks a channel, optionally declares that AI was used, and pastes text or uploads a file. Files are parsed to text: PDF with PyMuPDF, DOCX with python-docx, images with Tesseract OCR. The file goes to a private storage bucket and version 1 is created.
+1. **Submit.** The creator picks a channel, optionally declares that AI was used, and pastes text or uploads a file (up to 10 MB). Supported: PDF (scanned PDFs are read with OCR), Word .docx, images (PNG, JPG, WEBP, GIF, BMP, TIFF; read with Tesseract OCR), TXT/Markdown and HTML. Unsupported or damaged files get a clear message. The file goes to a private storage bucket and version 1 is created.
 2. **Review.** Two layers run (section 5). Progress streams to the screen: "Rule checks done, AI checks running...".
 3. **Findings appear.** The original text is highlighted by severity. Each highlight links to a card on the right. Clicking a source chip (for example `FACT-001`) shows the approved excerpt it came from.
 4. **Decide.** For each card the creator chooses **Accept** (apply the suggested replacement), **Edit** (type their own wording) or **Reject** (with a short reason).
