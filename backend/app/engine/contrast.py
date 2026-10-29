@@ -2,7 +2,7 @@
 import io
 from typing import List, Tuple
 
-from app.parsing.image_ocr import _tesseract, prepare_for_ocr
+from app.parsing.image_ocr import OCR_TIMEOUT, _tesseract, prepare_for_ocr
 
 RGB = Tuple[int, int, int]
 
@@ -39,7 +39,7 @@ def find_low_contrast_regions(image_bytes: bytes) -> List[dict]:
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     try:
         prepared, scale = prepare_for_ocr(img)  # find words on an enhanced copy, measure colours on the original
-        d = _tesseract().image_to_data(prepared, output_type=_tesseract().Output.DICT)
+        d = _tesseract().image_to_data(prepared, output_type=_tesseract().Output.DICT, timeout=OCR_TIMEOUT)
     except Exception:
         return []
     lines: dict = {}

@@ -30,7 +30,7 @@ def list_sources(user: UserContext = Depends(get_current_user)):
 
 
 @router.post("/sources", response_model=SourceOut)
-async def create_source(
+def create_source(  # sync on purpose: OCR/parsing/embedding run in the worker pool
     kind: str = Form(...), title: str = Form(...), code: Optional[str] = Form(None),
     text: Optional[str] = Form(None), file: Optional[UploadFile] = File(None),
     user: UserContext = Depends(require_roles(UserRole.ADMIN)),
@@ -40,7 +40,7 @@ async def create_source(
     body, path = text or "", None
     store, org = get_store(), str(user.org_id)
     if file is not None:
-        data = await file.read()
+        data = file.file.read()
         try:
             doc = parse_upload(file.filename or "", file.content_type or "", data)
         except UploadError as e:

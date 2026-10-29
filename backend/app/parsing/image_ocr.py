@@ -6,6 +6,7 @@ from app.parsing import ParsedDoc, UploadError
 
 MAX_SIDE = 2500   # very large photos are downscaled for OCR speed
 MIN_SIDE = 1400   # small or low-contrast images are upscaled so Tesseract can read them
+OCR_TIMEOUT = 30  # seconds; a slow OCR returns no text instead of hanging the request
 
 
 def _tesseract():
@@ -30,7 +31,7 @@ def prepare_for_ocr(img) -> Tuple[object, float]:
 def ocr_text(img) -> str:
     try:
         prepared, _ = prepare_for_ocr(img)
-        return _tesseract().image_to_string(prepared).strip()
+        return _tesseract().image_to_string(prepared, timeout=OCR_TIMEOUT).strip()
     except Exception:
         return ""
 

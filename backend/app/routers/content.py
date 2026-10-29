@@ -87,7 +87,7 @@ def sample_image(key: str, user: UserContext = Depends(get_current_user)):
 
 
 @router.post("/content")
-async def create_content(
+def create_content(  # sync on purpose: OCR/parsing runs in the worker pool, not on the event loop
     title: str = Form(...), channel: str = Form("instagram_post"), ai_generated: bool = Form(False),
     text: Optional[str] = Form(None), alt_text: Optional[str] = Form(None), file: Optional[UploadFile] = File(None),
     user: UserContext = Depends(require_roles(UserRole.CREATOR)),
@@ -97,7 +97,7 @@ async def create_content(
     store, org = get_store(), str(user.org_id)
     body, file_type, path, note = text or "", "text/plain", None, None
     if file is not None:
-        data = await file.read()
+        data = file.file.read()
         try:
             doc = parse_upload(file.filename or "", file.content_type or "", data)
         except UploadError as e:
