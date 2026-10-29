@@ -48,16 +48,25 @@ def _anthropic(system: str, user: str, model: str, key: str) -> str:
     return "".join(b.get("text", "") for b in r.json()["content"] if b.get("type") == "text")
 
 
-def _openai(system: str, user: str, model: str, key: str) -> str:
-    r = httpx.post("https://api.openai.com/v1/chat/completions", timeout=TIMEOUT,
-                   headers={"Authorization": f"Bearer {key}"},
-                   json={"model": model, "temperature": 0, "response_format": {"type": "json_object"},
-                         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]})
-    r.raise_for_status()
-    return r.json()["choices"][0]["message"]["content"]
+def _openai_compatible(base_url: str):
+    """OpenAI-style chat completions; used for OpenAI, Groq and xAI (Grok)."""
+    def call(system: str, user: str, model: str, key: str) -> str:
+        r = httpx.post(f"{base_url}/chat/completions", timeout=TIMEOUT,
+                       headers={"Authorization": f"Bearer {key}"},
+                       json={"model": model, "temperature": 0, "response_format": {"type": "json_object"},
+                             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]})
+        r.raise_for_status()
+        return r.json()["choices"][0]["message"]["content"]
+    return call
 
 
-PROVIDERS = {"gemini": _gemini, "anthropic": _anthropic, "openai": _openai}
+PROVIDERS = {
+    "gemini": _gemini,
+    "anthropic": _anthropic,
+    "openai": _openai_compatible("https://api.openai.com/v1"),
+    "groq": _openai_compatible("https://api.groq.com/openai/v1"),
+    "xai": _openai_compatible("https://api.x.ai/v1"),
+}
 
 
 def chain() -> List[Tuple[str, str, str]]:

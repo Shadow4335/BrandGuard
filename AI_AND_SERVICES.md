@@ -6,7 +6,7 @@
 |---|---|---|
 | Google Gemini API (default `LLM_PROVIDER=gemini`, model from `LLM_MODEL`, e.g. `gemini-2.5-flash`; `LLM_FALLBACK_MODEL` `gemini-flash-lite-latest` on overload or quota errors) | Layer B: tone and claim-vs-fact review, rewrite suggestions | The content text under review and the retrieved brand-source excerpts, per review. Only when `LLM_API_KEY` is set and `MOCK_LLM=false` |
 | Gemini embeddings (`gemini-embedding-001`, 768 dims) | Retrieval of relevant source chunks | Source chunks (when sources are added) and sentences of the content under review |
-| Anthropic Claude / OpenAI (optional: as the main provider, or as a backup via `LLM_BACKUP_PROVIDER` with its own key) | Backup for Layer B when Gemini is overloaded, out of quota or down | Same as Gemini, only for reviews that reach the backup. Each review records which provider answered (`review_runs.model`) |
+| **Groq** (backup in this deployment, model `openai/gpt-oss-120b`), or optionally Anthropic Claude, OpenAI or xAI Grok via `LLM_BACKUP_PROVIDER` with its own key | Backup for Layer B when Gemini is overloaded, out of quota or down | Same as Gemini, only for reviews that reach the backup. Each review records which provider answered (`review_runs.model`) |
 | Supabase (Postgres, Auth, Storage, pgvector) | Data, sign-in and sign-up, private files, vector search | All application data, including the email, name and hashed password of accounts judges create |
 | Vercel | Hosts the Next.js frontend | Static assets, page requests |
 | Render | Hosts the FastAPI backend (Docker) | API requests |

@@ -9,7 +9,7 @@ import type { Health } from "@/lib/types";
 export function GovernanceBanner() {
   const [health, setHealth] = useState<Health | null>(null);
   useEffect(() => { api.health().then(setHealth).catch(() => setHealth(null)); }, []); // also wakes the backend
-  const NAMES: Record<string, string> = { gemini: "Google Gemini", anthropic: "Anthropic Claude", openai: "OpenAI" };
+  const NAMES: Record<string, string> = { gemini: "Google Gemini", anthropic: "Anthropic Claude", openai: "OpenAI", groq: "Groq", xai: "xAI Grok" };
   const name = (p?: string) => (p ? NAMES[p] ?? p : "");
   const provider = health?.ai_live
     ? `${name(health.ai_provider)}${health.ai_backup ? ` (or ${name(health.ai_backup)} as backup)` : ""}`

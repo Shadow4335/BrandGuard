@@ -98,3 +98,29 @@ def test_no_backup_configured_means_no_backup_call(cfg, monkeypatch):
 def test_unknown_backup_provider_is_ignored(cfg, monkeypatch):
     monkeypatch.setattr(cfg, "llm_backup_provider", "acme")
     assert all(p != "acme" for p, _, _ in llm.chain()) and not cfg.llm_backup_ready
+
+
+@pytest.mark.parametrize("name,key,expected", [
+    ("groq", "gsk_abc", "groq"),
+    ("grok", "gsk_abc", "groq"),       # Groq key labelled "grok": sent to Groq, not xAI
+    ("grok", "xai-abc", "xai"),
+    ("xai", "xai-abc", "xai"),
+    ("groq", "xai-abc", "xai"),        # xAI key labelled "groq": sent to xAI
+    ("Anthropic", "sk-ant-x", "anthropic"),
+    ("openai", "sk-x", "openai"),
+])
+def test_backup_provider_name_and_key_format(name, key, expected):
+    from app.config import backup_provider
+    assert backup_provider(name, key) == expected
+
+
+def test_groq_and_xai_use_their_own_endpoints(monkeypatch):
+    seen = []
+    class R:
+        def raise_for_status(self): pass
+        def json(self): return {"choices": [{"message": {"content": OK}}]}
+    monkeypatch.setattr(llm.httpx, "post", lambda url, **kw: seen.append((url, kw["headers"]["Authorization"])) or R())
+    llm.PROVIDERS["groq"]("s", "u", "m", "gsk_k")
+    llm.PROVIDERS["xai"]("s", "u", "m", "xai-k")
+    assert seen == [("https://api.groq.com/openai/v1/chat/completions", "Bearer gsk_k"),
+                    ("https://api.x.ai/v1/chat/completions", "Bearer xai-k")]

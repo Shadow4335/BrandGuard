@@ -18,6 +18,25 @@ def _flag(name: str, default: str) -> bool:
     return os.getenv(name, default).lower() in ("true", "1", "yes")
 
 
+# Default model per backup provider when LLM_BACKUP_MODEL is not set (OpenAI and xAI must set it)
+BACKUP_DEFAULT_MODELS = {"anthropic": "claude-haiku-5-5", "gemini": "gemini-flash-lite-latest",
+                         "groq": "openai/gpt-oss-120b"}
+
+
+def backup_provider(name: str, key: str) -> str:
+    """Normalise the provider name. "grok" means xAI; Groq and xAI are easy to mix up, so a key in
+    Groq's format (gsk_...) is sent to Groq and one in xAI's format (xai-...) to xAI."""
+    name = name.strip().lower()
+    name = {"grok": "xai", "x.ai": "xai"}.get(name, name)
+    key = key.strip()
+    if name in ("xai", "groq"):
+        if key.startswith("gsk_"):
+            return "groq"
+        if key.startswith("xai-"):
+            return "xai"
+    return name
+
+
 class Settings(BaseModel):
     app_name: str = "BrandGuard API"
     app_version: str = "0.2.0"
@@ -27,11 +46,10 @@ class Settings(BaseModel):
     llm_model: str = os.getenv("LLM_MODEL", "gemini-2.5-flash")
     llm_fallback_model: str = os.getenv("LLM_FALLBACK_MODEL", "gemini-flash-lite-latest")  # used when the main model is overloaded
     # Optional second provider with its own key, tried after the main provider fails
-    llm_backup_provider: str = os.getenv("LLM_BACKUP_PROVIDER", "").strip().lower()
     llm_backup_api_key: str = os.getenv("LLM_BACKUP_API_KEY", "").strip()
-    llm_backup_model: str = os.getenv("LLM_BACKUP_MODEL", "").strip() or {
-        "anthropic": "claude-haiku-5-5", "gemini": "gemini-flash-lite-latest"}.get(
-        os.getenv("LLM_BACKUP_PROVIDER", "").strip().lower(), "")
+    llm_backup_provider: str = backup_provider(os.getenv("LLM_BACKUP_PROVIDER", ""), os.getenv("LLM_BACKUP_API_KEY", ""))
+    llm_backup_model: str = os.getenv("LLM_BACKUP_MODEL", "").strip() or BACKUP_DEFAULT_MODELS.get(
+        backup_provider(os.getenv("LLM_BACKUP_PROVIDER", ""), os.getenv("LLM_BACKUP_API_KEY", "")), "")
     embed_model: str = os.getenv("EMBED_MODEL", "gemini-embedding-001")
     embed_dim: int = int(os.getenv("EMBED_DIM", "768"))
     supabase_url: str = os.getenv("SUPABASE_URL", "")
@@ -53,7 +71,7 @@ class Settings(BaseModel):
 
     @property
     def llm_backup_ready(self) -> bool:
-        return bool(self.llm_backup_provider in ("gemini", "anthropic", "openai")
+        return bool(self.llm_backup_provider in ("gemini", "anthropic", "openai", "groq", "xai")
                     and self.llm_backup_api_key and self.llm_backup_model)
 
 
