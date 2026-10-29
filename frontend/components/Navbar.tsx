@@ -22,7 +22,6 @@ export function Navbar() {
         <Link href={user ? "/dashboard" : "/"} className="flex items-center gap-2 font-bold text-lg">
           <span className="w-8 h-8 rounded-lg bg-indigo-700 text-white flex items-center justify-center"><ShieldCheck className="w-5 h-5" /></span>
           <span>BrandGuard</span>
-          <span className="hidden md:inline text-xs font-normal text-zinc-600">GlowLeaf Naturals</span>
         </Link>
         {user && profile && (
           <nav aria-label="Main" className="flex flex-wrap items-center gap-1 text-sm">
