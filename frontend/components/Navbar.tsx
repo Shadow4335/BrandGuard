@@ -38,7 +38,10 @@ export function Navbar() {
               <button onClick={() => signOut()} title="Sign out" aria-label="Sign out" className="p-1.5 text-zinc-700 hover:bg-zinc-100 rounded-md"><LogOut className="w-4 h-4" /></button>
             </>
           ) : !loading ? (
-            <Link href="/login" className="px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-700 text-white">Sign In</Link>
+            <span className="flex items-center gap-2">
+              <Link href="/signup" className="px-3 py-1.5 text-xs font-medium rounded-lg border border-indigo-700 text-indigo-900">Sign up</Link>
+              <Link href="/login" className="px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-700 text-white">Sign In</Link>
+            </span>
           ) : null}
         </div>
       </div>

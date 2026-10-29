@@ -19,9 +19,17 @@ Layout note: the repo's own rules (GEMINI.md) took precedence over BUILD_WORKFLO
 
 Test suite: `cd backend && python -m pytest -q` (38 tests, offline).
 
+## Upload formats and real accounts
+
+| Check | Status |
+|---|---|
+| PDF (text), scanned PDF (OCR), DOCX (with alt-text check on pictures), PNG/JPG/WEBP/GIF (OCR, contrast, alt-text), TXT/Markdown (UTF-8 and UTF-16), HTML (`<img>` alt) | Tested offline (`tests/test_uploads.py`) and against real Supabase storage from localhost |
+| Corrupt, empty, oversized (>10 MB), `.doc`, HEIC, `.pptx`, `.zip` | Friendly 4xx message, no crash (tested) |
+| Sign-up with a chosen role, sign-in, wrong password, duplicate email, validation, rate limit (5 per IP per 10 min) | Tested offline and through the UI on a local offline build. **Supabase sign-up path not exercised by Claude** (no real accounts were created on the live site); it uses the same admin API as the seed script, which worked |
+
 ## Known limitations
 - The API uses the Supabase service role, so RLS and storage policies were not exercised directly (API-level role and org checks were).
-- Gemini sometimes returns 503 (overloaded). The adapter retries, then tries `LLM_FALLBACK_MODEL` (`gemini-2.5-flash-lite`), then falls back to offline checks with a visible notice. Live reviews take roughly 20 seconds. Which findings the model raises varies run to run (for example "100% natural" may be labelled Unsupported rather than contradicting FACT-001).
+- The Gemini key is on the free tier: `gemini-2.5-flash` hit its daily quota (429) during testing. Quota errors now skip straight to `LLM_FALLBACK_MODEL` (`gemini-flash-lite-latest`, verified working); overload (503) retries once first. Only if both fail does the review use offline checks, then falls back to offline checks with a visible notice. Live reviews take roughly 20 seconds. Which findings the model raises varies run to run (for example "100% natural" may be labelled Unsupported rather than contradicting FACT-001).
 - Free-tier Render sleeps after ~15 minutes idle; the first request can take up to a minute.
 - The version diff viewer loads lazily and can take a few seconds the first time.
 - Findings re-order after a decision is made (decided cards move down).
@@ -33,3 +41,5 @@ Test suite: `cd backend && python -m pytest -q` (38 tests, offline).
 - Accept on a finding without a literal replacement only acknowledges it; the creator must Edit to change text.
 - No Lighthouse accessibility run; contrast and keyboard focus were handled by design but not measured. Light theme only.
 - Not done: step 12 of the Golden Path on a deployed environment (covered by an automated offline test instead).
+- Sign-ups join the shared demo workspace and can pick any role, including Admin, which can add brand sources (nothing can be deleted through the app). This trades isolation for letting judges try every role.
+- Scanned PDFs: OCR covers the first 5 pages. Images are OCR'd at most 2500 px on the long side.

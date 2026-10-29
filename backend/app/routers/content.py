@@ -9,12 +9,28 @@ from app.engine.pipeline import latest_findings
 from app.models import Approval, Comment, ContentItem, ContentVersion, Finding, ReviewRun
 from app.models.api import CommentCreateIn, ContentDetail, QueueItem, SampleOut
 from app.models.enums import UserRole
-from app.parsing import parse_upload
+from app.parsing import UploadError, parse_upload
 from app.seed_data import SAMPLES, make_poster_png
 from app.store import get_store
 
 router = APIRouter(prefix="/api", tags=["Content"])
 CHANNELS = {"instagram_post", "website_page", "influencer_post", "press_release", "email"}
+
+
+def storage_name(filename: Optional[str]) -> str:
+    """Unique, storage-safe object name that keeps the extension (Supabase rejects some characters)."""
+    import re
+    import uuid
+    name = (filename or "upload").rsplit("/", 1)[-1]
+    stem, dot, ext = name.rpartition(".")
+    stem = re.sub(r"[^A-Za-z0-9_-]+", "-", stem if dot else name).strip("-")[:60] or "upload"
+    ext = re.sub(r"[^A-Za-z0-9]", "", ext)[:8].lower() if dot else ""
+    return f"{uuid.uuid4().hex[:8]}-{stem}" + (f".{ext}" if ext else "")
+
+
+def mime_for(file_type: str, fallback: Optional[str]) -> str:
+    return {"docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}.get(
+        file_type, file_type if "/" in file_type else (fallback or "application/octet-stream"))
 
 
 def get_content_or_404(content_id: str, user: UserContext) -> dict:
@@ -54,7 +70,7 @@ def build_detail(content: dict, user: UserContext) -> ContentDetail:
         approvals=[Approval(**a) for a in approvals],
         creator_name=(people.get(content.get("creator_id")) or {}).get("full_name"),
         allowed_actions=allowed_actions(content, user.role, str(user.user_id), findings),
-        has_image=bool(cur.get("file_path") and (cur.get("file_path") or "").lower().endswith((".png", ".jpg", ".jpeg", ".webp"))),
+        has_image=bool(cur.get("file_path")) and (cur.get("file_type") or "").startswith("image/"),
     )
 
 
@@ -82,13 +98,16 @@ async def create_content(
     body, file_type, path, note = text or "", "text/plain", None, None
     if file is not None:
         data = await file.read()
-        if len(data) > 10 * 1024 * 1024:
-            raise HTTPException(413, "That file is larger than 10 MB. Please upload a smaller one.")
-        doc = parse_upload(file.filename or "", file.content_type or "", data)
+        try:
+            doc = parse_upload(file.filename or "", file.content_type or "", data)
+        except UploadError as e:
+            raise HTTPException(e.status_code, e.message)
         body, file_type, note = doc.text or body, doc.file_type, doc.note
-        safe = (file.filename or "upload").replace("/", "_")
-        path = f"{org}/{user.user_id}/{safe}"
-        store.put_file("submissions", path, data, file.content_type or "application/octet-stream")
+        path = f"{org}/{user.user_id}/{storage_name(file.filename)}"
+        try:
+            store.put_file("submissions", path, data, mime_for(file_type, file.content_type))
+        except Exception:
+            raise HTTPException(502, "We couldn't save your file right now. Please try again in a moment.")
     elif not body.strip():
         raise HTTPException(400, "Paste some text or upload a file to review.")
     item = store.insert("content_items", {"org_id": org, "title": title.strip() or "Untitled", "status": "draft",
@@ -134,7 +153,8 @@ def content_image(content_id: str, version: Optional[int] = None, user: UserCont
     data = get_store().get_file("submissions", v[0]["file_path"])
     if data is None:
         raise HTTPException(404, "The image file is no longer available.")
-    return Response(data, media_type=v[0].get("file_type") or "image/png")
+    ftype = v[0].get("file_type") or ""
+    return Response(data, media_type=ftype if ftype.startswith("image/") else "application/octet-stream")
 
 
 @router.post("/content/{content_id}/comments")

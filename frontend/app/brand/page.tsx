@@ -28,6 +28,8 @@ function Brand() {
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [form, setForm] = useState({ title: "", code: "", text: "" });
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
   const reload = () => api.sources().then(setSources).catch((e) => setError(e.message));
   useEffect(() => { reload(); api.rules().then(setRules).catch((e) => setError(e.message)); }, []);
   const current = TABS.find((t) => t.id === tab)!;
@@ -38,8 +40,11 @@ function Brand() {
     const fd = new FormData();
     fd.set("kind", tab); fd.set("title", form.title); fd.set("text", form.text);
     if (form.code) fd.set("code", form.code);
-    try { await api.uploadSource(fd); setForm({ title: "", code: "", text: "" }); await reload(); setError(null); }
+    if (file) fd.set("file", file);
+    setBusy(true);
+    try { await api.uploadSource(fd); setForm({ title: "", code: "", text: "" }); setFile(null); await reload(); setError(null); }
     catch (err) { setError((err as Error).message); }
+    finally { setBusy(false); }
   }
 
   return (
@@ -81,8 +86,10 @@ function Brand() {
               <h2 className="font-semibold">Add to {current.label}</h2>
               <label className="block text-sm">Title<input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="mt-1 w-full border border-zinc-400 rounded px-2 py-1" /></label>
               <label className="block text-sm">Code (for citations, e.g. FACT-013)<input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} className="mt-1 w-full border border-zinc-400 rounded px-2 py-1" /></label>
-              <label className="block text-sm">Text<textarea required rows={4} value={form.text} onChange={(e) => setForm({ ...form, text: e.target.value })} className="mt-1 w-full border border-zinc-400 rounded px-2 py-1" /></label>
-              <button className="rounded-lg bg-indigo-700 text-white px-4 py-2 text-sm font-medium">Add source</button>
+              <label className="block text-sm">Text<textarea required={!file} rows={4} value={form.text} onChange={(e) => setForm({ ...form, text: e.target.value })} className="mt-1 w-full border border-zinc-400 rounded px-2 py-1" /></label>
+              <label className="block text-sm">...or upload a file (PDF, DOCX, image, TXT, HTML)
+                <input type="file" accept=".pdf,.docx,.txt,.md,.html,.htm,image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-1 w-full border border-zinc-400 rounded px-2 py-1" /></label>
+              <button disabled={busy} className="rounded-lg bg-indigo-700 text-white px-4 py-2 text-sm font-medium disabled:opacity-50">{busy ? "Adding..." : "Add source"}</button>
             </form>
           )}
         </>

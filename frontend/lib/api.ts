@@ -44,9 +44,8 @@ async function authHeaders(json = true): Promise<Record<string, string>> {
 
 async function parse<T>(res: Response): Promise<T> {
   if (!res.ok) {
-    let msg = "Something went wrong. Please try again.";
+    let msg = res.status === 401 ? "Your session expired. Please sign in again." : "Something went wrong. Please try again.";
     try { const j = await res.json(); if (typeof j.detail === "string") msg = j.detail; } catch { /* keep default */ }
-    if (res.status === 401) msg = "Your session expired. Please sign in again.";
     throw new ApiError(msg, res.status);
   }
   return res.json() as Promise<T>;
@@ -80,6 +79,9 @@ export const api = {
     return parse<Health>(res);
   },
   demoLogin: (role: string) => call<DemoSession>("POST", "/api/auth/demo-login", { role }),
+  login: (email: string, password: string) => call<DemoSession>("POST", "/api/auth/login", { email, password }),
+  signup: (body: { email: string; password: string; full_name: string; role: string }) =>
+    call<{ email: string; role: string; mode: "supabase" | "memory"; session?: DemoSession | null }>("POST", "/api/auth/signup", body),
 
   sources: () => call<Source[]>("GET", "/api/sources"),
   uploadSource: (form: FormData) => upload<Source>("/api/sources", form),

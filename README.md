@@ -20,6 +20,10 @@ The demo brand is **GlowLeaf Naturals**, a fictional Indian personal-care brand.
 
 Sample 2 is an influencer post (missing #Ad and AI label); sample 3 is a poster image (contrast and missing alt-text); sample 4 is clean.
 
+**Your own account:** click *Sign up* (top right or under the login form), pick a role, and you're in. No email confirmation. New accounts join the shared GlowLeaf Naturals demo workspace, so brand sources and sample history are already there. To see the whole workflow with one account, use the role switcher (it signs you in as the demo users).
+
+**Supported uploads (up to 10 MB):** PDF (scanned PDFs are read with OCR, first 5 pages), Word `.docx` (pictures without alt-text are flagged), images PNG/JPG/WEBP/GIF/BMP/TIFF (OCR, contrast and alt-text checks; add alt-text later from the content page), TXT/Markdown, and HTML (`<img>` without alt is flagged). Old `.doc`, HEIC, PowerPoint and other files get a clear message asking for a supported format.
+
 ## Stack
 
 Next.js (App Router, TypeScript, Tailwind, Recharts, react-diff-viewer) · FastAPI + pydantic v2 · Supabase (Postgres, Auth, Storage, pgvector, RLS) · hosted LLM + embeddings behind an adapter (Gemini by default) · PyMuPDF, python-docx, Tesseract, BeautifulSoup, rapidfuzz, Pillow · Vercel + Render (Docker).
@@ -54,6 +58,8 @@ Tests (offline, no keys): `cd backend && python -m pytest -q`.
 | `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | backend only | database, auth verification, storage |
 | `SUPABASE_ANON_KEY` | backend + frontend | public client key |
 | `LLM_PROVIDER`, `LLM_MODEL`, `LLM_API_KEY`, `MOCK_LLM` | backend only | AI layer; unset key = offline fallback |
+| `LLM_FALLBACK_MODEL` | backend only | second Gemini model used when the main one is overloaded or out of quota (default `gemini-flash-lite-latest`) |
+| `SIGNUP_ORG_ID` | backend only | optional: workspace new sign-ups join (defaults to the GlowLeaf demo org) |
 | `EMBED_MODEL`, `EMBED_DIM` | backend | embeddings (768) |
 | `ALLOWED_ORIGINS` | backend | CORS (add the Vercel URL) |
 | `DEMO_USER_PASSWORD` | backend/seed | password for demo accounts |

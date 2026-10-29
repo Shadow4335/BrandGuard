@@ -13,7 +13,7 @@ from app.store import get_store
 
 FALLBACK_NOTICE = ("AI layer unavailable: showing rule-based results plus offline claim and tone checks. "
                    "Nothing was sent to an AI provider.")
-IMAGE_EXT = (".png", ".jpg", ".jpeg", ".webp")
+IMAGE_EXT = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff")
 
 
 def latest_findings(version_id: str) -> List[dict]:
@@ -30,11 +30,21 @@ def review_steps(content: dict, user_id, org_id) -> Iterator[dict]:
     org = str(org_id)
     ver = store.select("content_versions", {"content_item_id": content["id"], "version_number": content["current_version"]})[0]
     path = ver.get("file_path") or ""
-    is_image = path.lower().endswith(IMAGE_EXT)
-    image = store.get_file("submissions", path) if is_image else None
+    ftype = ver.get("file_type") or ""
+    is_image = ftype.startswith("image/") or path.lower().endswith(IMAGE_EXT)
+    data = store.get_file("submissions", path) if path else None
+    image = data if is_image else None
+    missing_alt = 0
+    if data and ftype in ("docx", "text/html"):
+        from app.parsing import parse_upload
+        try:
+            missing_alt = parse_upload(path, ftype, data).images_missing_alt
+        except Exception:
+            missing_alt = 0
     ctx = ReviewContext(version_id=UUID(ver["id"]), org_id=UUID(org), text=ver.get("raw_text") or "",
                         channel=content.get("channel", "instagram_post"), ai_generated=bool(content.get("ai_generated")),
-                        alt_text=ver.get("alt_text"), image_bytes=image, is_image=is_image)
+                        alt_text=ver.get("alt_text"), image_bytes=image, is_image=is_image,
+                        images_missing_alt=missing_alt)
     yield {"stage": "start", "message": "Starting review..."}
 
     t0 = time.perf_counter()

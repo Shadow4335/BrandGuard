@@ -4,10 +4,10 @@
 
 | Service | Purpose | Data it receives |
 |---|---|---|
-| Google Gemini API (default `LLM_PROVIDER=gemini`, model from `LLM_MODEL`, e.g. `gemini-2.5-flash`) | Layer B: tone and claim-vs-fact review, rewrite suggestions | The content text under review and the retrieved brand-source excerpts, per review. Only when `LLM_API_KEY` is set and `MOCK_LLM=false` |
+| Google Gemini API (default `LLM_PROVIDER=gemini`, model from `LLM_MODEL`, e.g. `gemini-2.5-flash`; `LLM_FALLBACK_MODEL` `gemini-flash-lite-latest` on overload or quota errors) | Layer B: tone and claim-vs-fact review, rewrite suggestions | The content text under review and the retrieved brand-source excerpts, per review. Only when `LLM_API_KEY` is set and `MOCK_LLM=false` |
 | Gemini embeddings (`gemini-embedding-001`, 768 dims) | Retrieval of relevant source chunks | Source chunks (when sources are added) and sentences of the content under review |
 | Anthropic / OpenAI (optional adapters, `LLM_PROVIDER=anthropic\|openai`) | Alternative LLM providers | Same as Gemini |
-| Supabase (Postgres, Auth, Storage, pgvector) | Data, sign-in, private files, vector search | All application data |
+| Supabase (Postgres, Auth, Storage, pgvector) | Data, sign-in and sign-up, private files, vector search | All application data, including the email, name and hashed password of accounts judges create |
 | Vercel | Hosts the Next.js frontend | Static assets, page requests |
 | Render | Hosts the FastAPI backend (Docker) | API requests |
 

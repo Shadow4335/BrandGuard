@@ -26,6 +26,7 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   signIn: (email: string, password?: string) => Promise<boolean>;
+  signUp: (input: { email: string; password: string; full_name: string; role: UserRole }) => Promise<boolean>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -36,6 +37,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   error: null,
   signIn: async () => false,
+  signUp: async () => false,
   signOut: async () => {},
   refreshProfile: async () => {},
 });
@@ -123,27 +125,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     setLoading(true);
     try {
-      // Offline demo mode (no Supabase configured on the server): one-click token login
-      const role = DEMO_ROLES[email];
-      if (role) {
+      // Offline demo mode (no Supabase configured on the server): token login handled by the API
+      let memoryMode = false;
+      try { memoryMode = (await api.health()).store === "memory"; } catch { /* server asleep: try Supabase */ }
+      if (memoryMode) {
         try {
-          const health = await api.health();
-          if (health.store === "memory") {
-            const d = await api.demoLogin(role);
-            setDemoSession(d);
-            const st = demoToState(d);
-            setUser(st.user); setProfile(st.profile); setLoading(false);
-            return true;
-          }
-        } catch { /* fall through to Supabase sign-in */ }
+          const role = DEMO_ROLES[email];
+          const d = role ? await api.demoLogin(role) : await api.login(email, password);
+          setDemoSession(d);
+          const st = demoToState(d);
+          setUser(st.user); setProfile(st.profile); setLoading(false);
+          return true;
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Sign-in failed.");
+          setLoading(false);
+          return false;
+        }
       }
+      setDemoSession(null);
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (signInError) {
-        setError(signInError.message);
+        setError(/invalid login/i.test(signInError.message) ? "Wrong email or password." : signInError.message);
         setLoading(false);
         return false;
       }
@@ -157,6 +163,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Authentication failed";
       setError(msg);
+      setLoading(false);
+      return false;
+    }
+  };
+
+  const signUp = async (input: { email: string; password: string; full_name: string; role: UserRole }): Promise<boolean> => {
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await api.signup(input);
+      if (res.mode === "memory" && res.session) {
+        setDemoSession(res.session);
+        const st = demoToState(res.session);
+        setUser(st.user); setProfile(st.profile); setLoading(false);
+        return true;
+      }
+      return await signIn(res.email, input.password);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Sign-up failed. Please try again.");
       setLoading(false);
       return false;
     }
@@ -188,6 +213,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         error,
         signIn,
+        signUp,
         signOut,
         refreshProfile,
       }}

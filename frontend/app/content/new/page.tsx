@@ -75,10 +75,14 @@ function NewContent() {
         </label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={ai} onChange={(e) => setAi(e.target.checked)} /> This was created or assisted by AI</label>
         <label className="block text-sm font-medium">Paste text<textarea rows={7} value={text} onChange={(e) => setText(e.target.value)} className={input} /></label>
-        <label className="block text-sm font-medium">...or upload a PDF, DOCX or image
-          <input type="file" accept=".pdf,.docx,image/*,.txt,.html" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className={input} />
+        <label className="block text-sm font-medium">...or upload a file: PDF (including scans), Word .docx, image (PNG, JPG, WEBP, GIF), TXT or HTML, up to 10 MB
+          <input type="file" accept=".pdf,.docx,.txt,.md,.html,.htm,image/*" onChange={(e) => {
+            const f = e.target.files?.[0] ?? null;
+            if (f && f.size > 10 * 1024 * 1024) { setError("That file is larger than 10 MB. Please choose a smaller one."); e.target.value = ""; setFile(null); return; }
+            setError(null); setFile(f);
+          }} className={input} />
         </label>
-        {file && <p className="text-sm text-zinc-800">Selected file: {file.name}</p>}
+        {file && <p className="text-sm text-zinc-800">Selected file: {file.name}{text.trim() ? " (the file is reviewed; the pasted text is used only if the file has no readable text)" : ""}</p>}
         {file?.type.startsWith("image/") && (
           <label className="block text-sm font-medium">Alt-text (describe the image)<input value={alt} onChange={(e) => setAlt(e.target.value)} className={input} /></label>
         )}

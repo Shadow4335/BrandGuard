@@ -31,6 +31,7 @@ function ContentView() {
   const [imgSize, setImgSize] = useState<[number, number] | null>(null);
   const [cmpA, setCmpA] = useState<number | null>(null);
   const [tick, setTick] = useState(0);
+  const [alt, setAlt] = useState("");
   const autoRan = useRef(false);
 
   const load = useCallback(async () => {
@@ -77,6 +78,10 @@ function ContentView() {
   }
   async function saveVersion() {
     try { setError(null); const x = await api.saveVersion(id); setD(x); setCmpA(null); setTick((t) => t + 1); setNotice(`Saved as version ${x.content.current_version} and re-checked.`); }
+    catch (e) { setError((e as Error).message); }
+  }
+  async function saveAltText() {
+    try { setError(null); const x = await api.saveVersion(id, "Added alt-text", alt.trim()); setD(x); setAlt(""); setTick((t) => t + 1); setNotice(`Alt-text saved as version ${x.content.current_version} and re-checked.`); }
     catch (e) { setError((e as Error).message); }
   }
   async function submitForReview() {
@@ -127,6 +132,19 @@ function ContentView() {
             </div>
           )}
           {cur.alt_text ? <p className="text-sm">Alt-text: {cur.alt_text}</p> : imgUrl ? <p className="text-sm text-red-800">No alt-text</p> : null}
+          {imgUrl && editable && (
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="text-sm font-medium flex-1 min-w-[12rem]">{cur.alt_text ? "Change alt-text" : "Add alt-text"}
+                <input value={alt} onChange={(e) => setAlt(e.target.value)} placeholder="Describe the image and any text in it"
+                  className="mt-1 w-full border border-zinc-400 rounded px-2 py-1 text-sm" />
+              </label>
+              <button onClick={saveAltText} disabled={alt.trim().length < 5} className="rounded-lg bg-emerald-700 text-white px-3 py-1.5 text-sm font-medium disabled:opacity-50">Save as new version</button>
+            </div>
+          )}
+          {cur.file_path && !d.has_image && (
+            <p className="text-xs text-zinc-700">Text extracted from <strong>{cur.file_path.split("/").pop()?.replace(/^[0-9a-f]{8}-/, "")}</strong> ({cur.file_type === "docx" ? "Word document" : cur.file_type}).</p>
+          )}
+          {cur.note && /^(Scanned|No )/.test(cur.note) && <p role="status" className="text-sm rounded border border-amber-400 bg-amber-50 p-2">{cur.note}</p>}
           {cur.raw_text
             ? <HighlightedText text={cur.raw_text} findings={findings} selectedId={selected} onSelect={setSelected} />
             : !imgUrl && <p className="text-sm text-zinc-700">No text was found in this content.</p>}

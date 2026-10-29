@@ -2,7 +2,7 @@
 import io
 from typing import List, Tuple
 
-from app.parsing.image_ocr import _tesseract
+from app.parsing.image_ocr import _tesseract, prepare_for_ocr
 
 RGB = Tuple[int, int, int]
 
@@ -38,14 +38,17 @@ def find_low_contrast_regions(image_bytes: bytes) -> List[dict]:
     from PIL import Image
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     try:
-        d = _tesseract().image_to_data(img, output_type=_tesseract().Output.DICT)
+        prepared, scale = prepare_for_ocr(img)  # find words on an enhanced copy, measure colours on the original
+        d = _tesseract().image_to_data(prepared, output_type=_tesseract().Output.DICT)
     except Exception:
         return []
     lines: dict = {}
     for i, word in enumerate(d["text"]):
         if not word.strip() or float(d["conf"][i]) < 60 or len(word.strip()) < 2:
             continue
-        x, y, w, h = d["left"][i], d["top"][i], d["width"][i], d["height"][i]
+        x, y, w, h = (int(v / scale) for v in (d["left"][i], d["top"][i], d["width"][i], d["height"][i]))
+        if w < 2 or h < 2:
+            continue
         crop = img.crop((x, y, x + w, y + h))
         c1, c2 = dominant_two(crop)
         ratio = contrast_ratio(c1, c2)

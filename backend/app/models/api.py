@@ -22,6 +22,25 @@ class DemoLoginIn(BaseModel):
     role: str
 
 
+class SignupIn(BaseModel):
+    email: str
+    password: str
+    full_name: str
+    role: str = "creator"
+
+
+class LoginIn(BaseModel):
+    email: str
+    password: str
+
+
+class SignupOut(BaseModel):
+    email: str
+    role: str
+    mode: str                      # "supabase": sign in with Supabase next; "memory": token below
+    session: Optional["DemoLoginOut"] = None
+
+
 class DemoLoginOut(BaseModel):
     token: str
     user_id: str
@@ -155,3 +174,6 @@ class InsightsSummary(BaseModel):
     status_counts: Dict[str, int]
     override_approvals: int = 0
     approvals_total: int = 0
+
+
+SignupOut.model_rebuild()

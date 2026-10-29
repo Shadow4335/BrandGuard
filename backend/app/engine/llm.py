@@ -3,6 +3,7 @@ Any failure raises LLMError so the caller can fall back to the offline path."""
 import json
 import logging
 import re
+import time
 
 import httpx
 
@@ -64,19 +65,22 @@ def complete_json(system: str, user: str) -> dict:
     fn = PROVIDERS.get(s.llm_provider)
     if not fn:
         raise LLMError(f"Unknown LLM_PROVIDER {s.llm_provider}")
-    # Attempts: main model, main model again after a pause (transient 503/429), then the fallback model
-    import time
-    attempts = [(s.llm_model, 0.0), (s.llm_model, 1.5)]
+    # Each model gets one retry for transient errors (timeouts, 503 overload). Quota (429) and
+    # unknown-model (404) errors skip straight to the next model, since retrying can't help.
+    models = [s.llm_model]
     if s.llm_provider == "gemini" and s.llm_fallback_model and s.llm_fallback_model != s.llm_model:
-        attempts.append((s.llm_fallback_model, 0.0))
+        models.append(s.llm_fallback_model)
     last: Exception = LLMError("unknown")
-    for model, pause in attempts:
-        if pause:
-            time.sleep(pause)
-        try:
-            text = fn(system, user, model) if s.llm_provider == "gemini" else fn(system, user)
-            return json.loads(strip_fences(text))
-        except Exception as e:  # network, timeout, overload, bad JSON
-            last = e
-            print(f"LLM call failed ({s.llm_provider}/{model}): {type(e).__name__}: {str(e)[:160]}", flush=True)
+    for model in models:
+        for attempt in range(2):
+            try:
+                text = fn(system, user, model) if s.llm_provider == "gemini" else fn(system, user)
+                return json.loads(strip_fences(text))
+            except Exception as e:  # network, timeout, overload, quota, bad JSON
+                last = e
+                print(f"LLM call failed ({s.llm_provider}/{model}): {type(e).__name__}: {str(e)[:160]}", flush=True)
+                if any(code in str(e) for code in ("429", "RESOURCE_EXHAUSTED", "404", "NOT_FOUND")):
+                    break
+                if attempt == 0:
+                    time.sleep(1.5)
     raise LLMError(str(last))

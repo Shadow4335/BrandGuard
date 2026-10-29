@@ -9,7 +9,8 @@ from app.engine.embeddings import embed_texts
 from app.engine.rules_loader import load_rules
 from app.models.api import RuleOut, SourceOut
 from app.models.enums import UserRole
-from app.parsing import parse_upload
+from app.parsing import UploadError, parse_upload
+from app.routers.content import mime_for, storage_name
 from app.seed_data import chunk_text
 from app.store import get_store
 
@@ -40,9 +41,16 @@ async def create_source(
     store, org = get_store(), str(user.org_id)
     if file is not None:
         data = await file.read()
-        body = parse_upload(file.filename or "", file.content_type or "", data).text or body
-        path = f"{org}/{file.filename}"
-        store.put_file("sources", path, data, file.content_type or "application/octet-stream")
+        try:
+            doc = parse_upload(file.filename or "", file.content_type or "", data)
+        except UploadError as e:
+            raise HTTPException(e.status_code, e.message)
+        body = doc.text or body
+        path = f"{org}/{storage_name(file.filename)}"
+        try:
+            store.put_file("sources", path, data, mime_for(doc.file_type, file.content_type))
+        except Exception:
+            raise HTTPException(502, "We couldn't save your file right now. Please try again in a moment.")
     if not body.strip():
         raise HTTPException(400, "Add some text or upload a file with readable text.")
     row = store.insert("sources", {"org_id": org, "title": title, "source_type": kind, "code": code,
