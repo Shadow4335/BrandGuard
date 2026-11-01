@@ -7,6 +7,16 @@ import type {
 // Tolerate trailing slashes or stray punctuation in the env var (a "//api/..." path 404s on the server)
 export const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").trim().replace(/[/.\s]+$/, "");
 const DEMO_KEY = "bg_demo_session";
+const WORKSPACE_KEY = "bg_workspace_id";
+let selectedWorkspace: string | null | undefined;
+export function getWorkspaceId(): string | null {
+  if (selectedWorkspace !== undefined) return selectedWorkspace;
+  try { return typeof window !== "undefined" ? window.localStorage.getItem(WORKSPACE_KEY) : null; } catch { return null; }
+}
+export function setWorkspaceId(id: string | null) {
+  selectedWorkspace = id;
+  try { if (id) window.localStorage.setItem(WORKSPACE_KEY, id); else window.localStorage.removeItem(WORKSPACE_KEY); } catch { /* selection lasts for this page */ }
+}
 
 export interface DemoSession {
   token: string; user_id: string; email: string; org_id: string; role: string; full_name?: string | null;
@@ -45,7 +55,7 @@ async function token(): Promise<string | null> {
 
 async function authHeaders(json = true): Promise<Record<string, string>> {
   const t = await token();
-  return { ...(json ? { "Content-Type": "application/json" } : {}), ...(t ? { Authorization: `Bearer ${t}` } : {}) };
+  return { ...(json ? { "Content-Type": "application/json" } : {}), ...(t ? { Authorization: `Bearer ${t}` } : {}), ...(getWorkspaceId() ? { "X-Workspace-ID": getWorkspaceId()! } : {}) };
 }
 
 async function parse<T>(res: Response): Promise<T> {
@@ -97,6 +107,8 @@ export const api = {
   signup: (body: { email: string; password: string; full_name: string; role: string; invite_code?: string; role_password?: string }) =>
     call<{ email: string; role: string; mode: "supabase" | "memory"; session?: DemoSession | null }>("POST", "/api/auth/signup", body),
 
+  workspaces: () => call<{ current_id: string; workspaces: import("./types").Organisation[]; can_create: boolean; membership_mode: string }>("GET", "/api/workspaces"),
+  createWorkspace: (name: string, description: string) => call<import("./types").Organisation>("POST", "/api/workspaces", { name, description }),
   sources: () => call<Source[]>("GET", "/api/sources"),
   uploadSource: (form: FormData) => upload<Source>("/api/sources", form),
   rules: () => call<RuleInfo[]>("GET", "/api/rules"),

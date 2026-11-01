@@ -1,10 +1,10 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase";
 import { Profile, UserRole } from "@/lib/types";
-import { api, getDemoSession, setDemoSession, setFreshToken, DemoSession } from "@/lib/api";
+import { api, getDemoSession, setDemoSession, setFreshToken, getWorkspaceId, setWorkspaceId, DemoSession } from "@/lib/api";
 import { signInWithGooglePopup } from "@/lib/firebase";
 
 const DEMO_ROLES: Record<string, UserRole> = {
@@ -32,6 +32,7 @@ interface AuthContextType {
   signUp: (input: { email: string; password: string; full_name: string; role: UserRole; invite_code?: string; role_password?: string }) => Promise<boolean>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  switchWorkspace: (id: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -45,6 +46,7 @@ const AuthContext = createContext<AuthContextType>({
   signUp: async () => false,
   signOut: async () => {},
   refreshProfile: async () => {},
+  switchWorkspace: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -54,31 +56,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = useCallback(async (userId: string) => {
     try {
-      const { data, error: profError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .single();
-
-      if (profError) {
-        // Reading the profile directly failed, so ask the API: it decides role and workspace. Never take the role
-        // from user_metadata, which signed-in users can edit themselves.
-        const authUser = (await supabase.auth.getUser()).data.user;
-        try {
-          const me = await api.me();
-          setProfile({ id: userId, org_id: me.org_id, role: me.role as UserRole, email: me.email, full_name: me.full_name ?? undefined });
-        } catch {
-          setProfile({ id: userId, org_id: "", role: "creator", email: authUser?.email, full_name: authUser?.email?.split("@")[0] });
-        }
-      } else if (data) {
-        setProfile(data as Profile);
-      }
-    } catch (e: unknown) {
-      console.warn("Could not fetch database profile:", e);
-    }
-  };
+      let me;
+      try { me = await api.me(); }
+      catch (e) { if (!getWorkspaceId()) throw e; setWorkspaceId(null); me = await api.me(); }
+      setProfile({ id: userId, org_id: me.org_id, role: me.role as UserRole, email: me.email, full_name: me.full_name });
+    } catch { setProfile(null); setError("Could not load your workspace. Please sign in again."); }
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -88,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const demo = getDemoSession();
         if (demo) {
           const st = demoToState(demo);
-          if (mounted) { setUser(st.user); setProfile(st.profile); }
+          if (mounted) { setUser(st.user); setProfile(st.profile); await fetchProfile(demo.user_id); }
           return;
         }
         const { data: { session } } = await supabase.auth.getSession();
@@ -96,8 +81,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(session.user);
           await fetchProfile(session.user.id);
         }
-      } catch (err: unknown) {
-        console.warn("Auth initialization note:", err);
+      } catch {
+        setError("Could not restore your session. Please sign in again.");
       } finally {
         if (mounted) setLoading(false);
       }
@@ -106,11 +91,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initAuth();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         if (!mounted || getDemoSession()) return; // demo sessions are not Supabase sessions
         if (session?.user) {
           setUser(session.user);
-          await fetchProfile(session.user.id);
+          setFreshToken(session.access_token);
+          void fetchProfile(session.user.id).finally(() => setFreshToken(null));
         } else {
           setUser(null);
           setProfile(null);
@@ -123,10 +109,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       authListener?.subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [supabase, fetchProfile]);
 
   const signIn = async (email: string, password: string): Promise<boolean> => {
     setError(null);
+    setWorkspaceId(null);
     setLoading(true);
     try {
       // Offline demo mode (no Supabase configured on the server): token login handled by the API
@@ -175,6 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /** One-click demo account. The server signs the demo user in, so the browser never holds a demo password. */
   const signInDemo = async (role: UserRole): Promise<boolean> => {
     setError(null);
+    setWorkspaceId(null);
     setLoading(true);
     try {
       let offline = false;
@@ -261,6 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (input: { email: string; password: string; full_name: string; role: UserRole; invite_code?: string; role_password?: string }): Promise<boolean> => {
     setError(null);
+    setWorkspaceId(null);
     setLoading(true);
     try {
       const res = await api.signup(input);
@@ -284,6 +273,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Tell the API first, while the token is still available, so it drops it from its cache straight away
       await api.logout().catch(() => {});
       setDemoSession(null);
+      setWorkspaceId(null);
       await supabase.auth.signOut();
       setUser(null);
       setProfile(null);
@@ -296,6 +286,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user) {
       await fetchProfile(user.id);
     }
+  };
+
+  const switchWorkspace = async (id: string) => {
+    const previous = getWorkspaceId();
+    setWorkspaceId(id);
+    try {
+      const me = await api.me();
+      setProfile({ id: me.user_id, org_id: me.org_id, role: me.role as UserRole, email: me.email, full_name: me.full_name });
+    } catch (e) { setWorkspaceId(previous); throw e; }
   };
 
   return (
@@ -311,6 +310,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signUp,
         signOut,
         refreshProfile,
+        switchWorkspace,
       }}
     >
       {children}

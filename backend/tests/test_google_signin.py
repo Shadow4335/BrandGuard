@@ -180,10 +180,11 @@ def test_token_cache_honours_ttl_and_token_expiry(monkeypatch):
     assert auth.cached_user("token-a") is None
 
 
-def test_google_sign_up_with_a_privileged_role_needs_the_admin_password(monkeypatch):
+@pytest.mark.parametrize("role", ["manager", "reviewer", "admin"])
+def test_google_sign_up_with_a_privileged_role_needs_the_admin_password(monkeypatch, role):
     monkeypatch.setenv("PRIVILEGED_SIGNUP_PASSWORD", "orchid-ledger-7731-quiet")
     monkeypatch.setattr(core, "verify_firebase_token", google_account(fresh_email()))
-    assert sign_in(role="reviewer").status_code == 403
-    r = c.post("/api/auth/google", json={"id_token": "valid-token", "role": "reviewer",
+    assert sign_in(role=role).status_code == 403
+    r = c.post("/api/auth/google", json={"id_token": "valid-token", "role": role,
                                          "role_password": "orchid-ledger-7731-quiet"})
-    assert r.status_code == 200 and r.json()["created"] is True and r.json()["session"]["role"] == "reviewer"
+    assert r.status_code == 200 and r.json()["created"] is True and r.json()["session"]["role"] == role

@@ -20,7 +20,7 @@ The demo brand is **GlowLeaf Naturals**, a fictional Indian personal-care brand.
 
 Sample 2 is an influencer post (missing #Ad and AI label); sample 3 is a poster image (contrast and missing alt-text); sample 4 is clean.
 
-**Your own account:** click *Sign up* (top right or under the login form), and you're in as a Creator. Manager, Reviewer and Admin can also be chosen there with the admin password (`PRIVILEGED_SIGNUP_PASSWORD`). Passwords need 10+ characters and are checked on the server. No email confirmation. New accounts join the shared GlowLeaf Naturals demo workspace, so brand sources and sample history are already there. Admin accounts can't be self-created; use the one-click Admin demo. To see the whole workflow, use the demo role switcher (shown only while signed in as a demo user) or sign out and pick another demo role.
+**Your own account:** click *Sign up* (top right or under the login form), and you're in as a Creator. Manager, Reviewer and Admin can also be chosen there with the admin password (`PRIVILEGED_SIGNUP_PASSWORD`). Passwords need 10+ characters and are checked on the server. No email confirmation. New accounts join the shared GlowLeaf Naturals demo workspace, so brand sources and sample history are already there. Admin signup also requires the server-configured admin password. To see the whole workflow, use the demo role switcher (shown only while signed in as a demo user) or sign out and pick another demo role.
 
 **Supported uploads (up to 10 MB):** PDF (scanned PDFs are read with OCR, first 5 pages), Word `.docx` (pictures without alt-text are flagged), images PNG/JPG/WEBP/GIF/BMP/TIFF (OCR, contrast and alt-text checks; add alt-text later from the content page), TXT/Markdown, and HTML (`<img>` without alt is flagged). Old `.doc`, HEIC, PowerPoint and other files get a clear message asking for a supported format.
 
@@ -81,7 +81,7 @@ Firebase only confirms who the person is. The API checks the Firebase ID token, 
 | `ALLOWED_ORIGINS` | backend | CORS (add the Vercel URL) |
 | `DEMO_USER_PASSWORD` | backend/seed | secret password of the four demo accounts; only the server uses it. Set a long random value and run `seed/rotate_demo_passwords.py` |
 | `DEMO_MODE` | backend | `false` (default) leaves only real accounts; `true` enables the one-click demo accounts and lets anyone sign up to the shared demo workspace. With Supabase, the API refuses to start in demo mode while `DEMO_USER_PASSWORD` is the published default |
-| `SIGNUP_ALLOWED_ROLES` | backend | roles anyone may pick at sign-up (default `creator`) |
+| `SIGNUP_ALLOWED_ROLES` | backend | legacy option, ignored; Creator is the only role without an admin password |
 | `PRIVILEGED_SIGNUP_PASSWORD` | backend only | admin password (12+ characters) that lets people sign up as manager, reviewer or admin; empty means those roles can't be chosen at sign-up |
 | `FIREBASE_PROJECT_ID` | backend | turns on Google sign-in; ID tokens must come from this Firebase project |
 | `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `NEXT_PUBLIC_FIREBASE_APP_ID` | frontend | Firebase web app config for the Google popup (public values) |
@@ -108,3 +108,11 @@ Secrets live only in environment variables; `.env*` files are git-ignored.
 | Confidentiality and AI disclosure | RLS, private buckets, banner, `/about-ai`, AI_AND_SERVICES.md |
 
 *Not legal advice. The demo brand, facts and certifications are fictional; regulatory summaries are paraphrased, so verify against the official sources linked in each.*
+
+### Silver interface and additional workspaces
+
+The current interface follows `BrandGuard-Latest-Kit`: Silver artwork, responsive workspace navigation, manual hero slides, sliding tabs and reduced-motion support. For extra workspaces, apply the optional additive `seed/migrations/004_workspace_memberships.sql` in Supabase; this does not move accounts or grant access to existing organisations. Admins can then create a real workspace from the workspace dropdown. Additional members and their roles are provisioned server-side. Each switch is checked against verified membership; the original profile and workspace are retained. In-memory mode supports the same API for local testing.
+
+Elevated email and Google signup always require `PRIVILEGED_SIGNUP_PASSWORD` (12+ characters, backend only). `SIGNUP_ALLOWED_ROLES` can no longer bypass this requirement. Google requires the Firebase configuration described above. No provider keys or admin passwords belong in frontend configuration.
+
+On hosts that restrict Turbopack worker ports, use `cd frontend && npm run build -- --webpack`; both build engines use the official Tailwind PostCSS integration.

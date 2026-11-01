@@ -44,14 +44,16 @@ def _rule_stats(findings: List[dict]) -> List[RuleStat]:
 def summary(user: UserContext = Depends(get_current_user)):
     store, org = get_store(), str(user.org_id)
     findings = _current_findings(org)
-    stats = _rule_stats(findings)
     since = datetime.now(timezone.utc) - timedelta(days=30)
     recent = [f for f in findings if datetime.fromisoformat(f["created_at"].replace("Z", "+00:00")) >= since]
+    stats = _rule_stats(recent)
     days = Counter(f["created_at"][:10] for f in recent)
     trend = [{"date": (since + timedelta(days=i + 1)).date().isoformat(),
               "count": days.get((since + timedelta(days=i + 1)).date().isoformat(), 0)} for i in range(30)]
     items = store.select("content_items", {"org_id": org})
-    approvals = store.select("approvals", {"org_id": org})
+    items = [i for i in items if datetime.fromisoformat(i["created_at"].replace("Z", "+00:00")) >= since]
+    approvals = [a for a in store.select("approvals", {"org_id": org})
+                 if datetime.fromisoformat(a["created_at"].replace("Z", "+00:00")) >= since]
     cats = Counter(f["category"] for f in recent)
     return InsightsSummary(
         total_findings=len(recent), total_content=len(items),

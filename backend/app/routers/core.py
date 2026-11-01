@@ -6,7 +6,6 @@ import secrets
 import time
 import uuid
 from collections import defaultdict, deque
-from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
@@ -51,6 +50,7 @@ def health():
 def me(user: UserContext = Depends(get_current_user)):
     return {"user_id": str(user.user_id), "email": user.email, "org_id": str(user.org_id),
             "role": user.role.value, "full_name": user.full_name}
+
 
 
 def _session(p: dict) -> DemoLoginOut:
@@ -134,7 +134,7 @@ def _signup_workspace(invite_code: Optional[str]) -> str:
 
 
 def _check_signup_role(role: str, role_password: Optional[str]) -> bool:
-    """Whether this role may be self-assigned. Creator (and anything in SIGNUP_ALLOWED_ROLES) is open; manager,
+    """Whether this role may be self-assigned. Only Creator is open; manager,
     reviewer and admin need the admin password. Returns True when the admin password was used. Call it after the
     sign-up rate limit, so wrong passwords count toward it and can't be guessed quickly."""
     s = get_settings()
@@ -148,7 +148,7 @@ def _check_signup_role(role: str, role_password: Optional[str]) -> bool:
         if not secrets.compare_digest(role_password.encode(), s.role_password.encode()):
             raise HTTPException(403, "That admin password isn't right.")
         return True
-    raise HTTPException(403, "New accounts start as Creator. Ask an admin if you need another role.")
+    raise HTTPException(403, "Admin authorization is not configured on this server. Ask an admin, or sign up as a Creator.")
 
 
 def _rate_limit(request: Request) -> None:
@@ -301,20 +301,17 @@ def google_login(body: GoogleLoginIn, request: Request):
     def magic_link():
         return admin.generate_link({"type": "magiclink", "email": email})
 
-    # Returning users are the common case: look up the profile and make the one-time sign-in link at the same time
-    # (one Supabase round trip instead of two).
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        profile_job, link_job = pool.submit(find_profile), pool.submit(magic_link)
-        profile = profile_job.result()
-        try:
-            early_link = link_job.result()
-        except Exception:
-            early_link = None  # e.g. the email has no auth user yet
-
+    # generate_link can CREATE an auth user. Authorize new accounts before calling it.
+    profile = find_profile()
     created = profile is None
     if created:
         with_password = _check_signup_role(role, body.role_password)
         org = _signup_workspace(body.invite_code)
+    try:
+        early_link = magic_link()
+    except Exception:
+        early_link = None
+    if created:
         meta = {"full_name": name, "role": role, "firebase_uid": claims.get("sub")}
         try:
             if early_link and early_link.user:

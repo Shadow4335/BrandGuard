@@ -1,5 +1,6 @@
 "use client";
 
+import { hasTextChange } from "@/lib/findings";
 import type { Finding, FindingSeverity } from "@/lib/types";
 
 const BG: Record<FindingSeverity, string> = {
@@ -31,7 +32,7 @@ export function HighlightedText({
     const chunk = text.slice(s, e);
     if (!covering.length) { parts.push(<span key={`t-${s}`}>{chunk}</span>); continue; }
     const top = covering.find((f) => f.id === selectedId) ?? covering[0];
-    const resolved = top.status === "accepted" || top.status === "edited";
+    const resolved = hasTextChange(top);
     parts.push(
       <mark key={`m-${s}`} onClick={() => onSelect(top.id)} tabIndex={0} role="button"
         onKeyDown={(e2) => { if (e2.key === "Enter" || e2.key === " ") { e2.preventDefault(); onSelect(top.id); } }}
@@ -40,5 +41,7 @@ export function HighlightedText({
         {chunk}
       </mark>);
   }
+  inserts.filter((f) => f.span!.start === text.length).forEach((f) => parts.push(
+    <button key={`end-${f.id}`} type="button" onClick={() => onSelect(f.id)} aria-label={`Insertion point: ${f.issue}`} className={`px-1 mx-0.5 rounded border-b-2 text-xs font-bold ${BG[f.severity]}`}>+ add</button>));
   return <p className="whitespace-pre-wrap leading-relaxed text-zinc-900">{parts}</p>;
 }

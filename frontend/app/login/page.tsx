@@ -1,241 +1,91 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowRight, ArrowUpRight, AlertCircle, ChevronDown } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { GoogleSignIn } from "@/components/GoogleSignIn";
+import { PasswordInput } from "@/components/PasswordInput";
 import { api } from "@/lib/api";
-import { UserRole } from "@/lib/types";
-import {
-  ShieldCheck,
-  Eye,
-  EyeOff,
-  UserCheck,
-  Sparkles,
-  Lock,
-  ArrowRight,
-  AlertCircle,
-} from "lucide-react";
+import type { UserRole } from "@/lib/types";
 
-const DEMO_ACCOUNTS: { role: UserRole; email: string; label: string; desc: string; color: string }[] = [
-  {
-    role: "admin",
-    email: "admin@demo.test",
-    label: "Admin",
-    desc: "Configure rules, sources & system policies",
-    color: "bg-purple-500/10 text-purple-800 border-purple-500/30 hover:bg-purple-500/20",
-  },
-  {
-    role: "creator",
-    email: "creator@demo.test",
-    label: "Creator",
-    desc: "Draft copy, upload assets & run checks",
-    color: "bg-blue-500/10 text-blue-800 border-blue-500/30 hover:bg-blue-500/20",
-  },
-  {
-    role: "manager",
-    email: "manager@demo.test",
-    label: "Manager",
-    desc: "Review findings, escalate & approve drafts",
-    color: "bg-emerald-500/10 text-emerald-800 border-emerald-500/30 hover:bg-emerald-500/20",
-  },
-  {
-    role: "reviewer",
-    email: "reviewer@demo.test",
-    label: "Reviewer",
-    desc: "Legal & compliance review with justification",
-    color: "bg-amber-500/10 text-amber-800 border-amber-500/30 hover:bg-amber-500/20",
-  },
+const DEMO_ACCOUNTS: { role: UserRole; label: string; desc: string }[] = [
+  { role: "creator", label: "Creator", desc: "Draft content, run checks and decide on suggestions." },
+  { role: "manager", label: "Brand Manager", desc: "Review submissions, request changes or escalate." },
+  { role: "reviewer", label: "Authorised Reviewer", desc: "Decide escalated content, with reasons on record." },
+  { role: "admin", label: "Admin", desc: "Manage approved brand sources and view insights." },
 ];
 
 export default function LoginPage() {
   const router = useRouter();
-  const { signIn, signInDemo, error: authError } = useAuth();
-  const [demoMode, setDemoMode] = useState(true); // until the server says the demo accounts are off
-  useEffect(() => { api.health().then((h) => setDemoMode(h.demo_mode !== false)).catch(() => {}); }, []);
-
+  const { signIn, signInDemo, error } = useAuth();
+  const [demoMode, setDemoMode] = useState<boolean | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [pending, setPending] = useState<string | null>(null);
-  const [localError, setLocalError] = useState<string | null>(null);
+  const [pending, setPending] = useState<UserRole | null>(null);
 
-  const handleManualSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLocalError(null);
-    setLoading(true);
+  useEffect(() => {
+    let active = true;
+    api.health().then((h) => { if (active) setDemoMode(h.demo_mode === true); }).catch(() => { if (active) setDemoMode(false); });
+    return () => { active = false; };
+  }, []);
 
-    const success = await signIn(email, password);
-    setLoading(false);
-    if (success) {
-      router.push("/dashboard");
-    }
-  };
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault(); setLoading(true);
+    try { if (await signIn(email, password)) router.push("/dashboard"); }
+    finally { setPassword(""); setLoading(false); }
+  }
 
-  const handleQuickSignIn = async (role: UserRole, demoEmail: string) => {
-    setLocalError(null);
-    setLoading(true);
-    setPending(demoEmail);
+  async function demo(role: UserRole) {
+    setLoading(true); setPending(role);
+    try { if (await signInDemo(role)) router.push("/dashboard"); }
+    finally { setLoading(false); setPending(null); }
+  }
 
-    const success = await signInDemo(role);
-    setLoading(false);
-    setPending(null);
-    if (success) {
-      router.push("/dashboard");
-    }
-  };
+  return <div className="login-page">
+    <header className="login-heading">
+      <p className="eyebrow">A considered perspective</p>
+      <h1>Sign in to BrandGuard</h1>
+      <p>Your brand’s guidelines, evidence and decisions.<br />All in one workspace.</p>
+    </header>
 
-  return (
-    <div className="min-h-[calc(100vh-6rem)] flex flex-col justify-center items-center px-4 py-8">
-      <div className="w-full max-w-md space-y-8">
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 mb-2 shadow-sm">
-            <ShieldCheck className="w-8 h-8" />
-          </div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Sign in to BrandGuard
-          </h1>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Pre-publication governance platform. AI suggests, humans decide.
-          </p>
-        </div>
+    <form onSubmit={submit} className="login-form" aria-label="Sign in" aria-busy={loading}>
+      {error && <div role="alert" className="login-error"><AlertCircle size={18} /><span>{error}</span></div>}
+      <label htmlFor="login-email">Email address</label>
+      <input id="login-email" name="email" type="email" autoComplete="username" required disabled={loading} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" />
+      <label htmlFor="login-password">Password</label>
+      <PasswordInput id="login-password" name="password" autoComplete="current-password" required disabled={loading} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" />
+      <button type="submit" disabled={loading} className="login-submit"><span>{loading && !pending ? "Signing in…" : "Sign in"}</span><ArrowRight size={18} /></button>
+      <div className="login-divider"><span>or</span></div>
+      <div className="login-provider"><GoogleSignIn disabled={loading} /></div>
+      <p className="login-create">New to BrandGuard? <Link href="/signup">Create an account <ArrowUpRight size={13} /></Link></p>
+    </form>
 
-        {/* Demo Accounts Panel */}
-        {demoMode && (<>
-        <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 backdrop-blur-sm space-y-3">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
-            <Sparkles className="w-4 h-4 text-indigo-500" />
-            <span>One-Click Demo Accounts</span>
-          </div>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Select a role to sign in instantly with test credentials:
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            {DEMO_ACCOUNTS.map((acc) => (
-              <button
-                key={acc.role}
-                type="button"
-                onClick={() => handleQuickSignIn(acc.role, acc.email)}
-                disabled={loading} aria-busy={pending === acc.email}
-                className={`p-3 rounded-lg border text-left transition-all duration-150 flex flex-col justify-between ${acc.color} disabled:opacity-50`}
-              >
-                <div className="flex items-center justify-between w-full">
-                  <span className="font-semibold text-sm">{acc.label}</span>
-                  <UserCheck className="w-3.5 h-3.5 opacity-80" />
-                </div>
-                <span className="text-xs opacity-90 mt-1">{pending === acc.email ? "Signing in…" : acc.desc}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-950">
-          <p className="font-semibold mb-2">Try it in 2 minutes</p>
-          <ol className="list-decimal pl-5 space-y-1">
-            <li>Creator: New content, Load sample 1, Submit for AI review</li>
-            <li>Accept, edit or reject each suggestion, then save a new version</li>
-            <li>Submit for review</li>
-            <li>Manager: comment and Escalate</li>
-            <li>Reviewer: Approve (an override reason is required). Then open Insights as Admin.</li>
-          </ol>
-          <p className="mt-2 text-xs">Demo accounts share one fictional workspace. Create your own account below for private sign-in.</p>
-        </div>
-        </>)}
-
-        {/* Form Separator */}
-        <div className="relative flex items-center justify-center">
-          <div className="border-t border-zinc-200 dark:border-zinc-800 w-full" />
-          <span className="bg-zinc-50 px-3 text-xs text-zinc-600 uppercase tracking-wider absolute">
-            Or standard login
-          </span>
-        </div>
-
-        {/* Standard Form */}
-        <form onSubmit={handleManualSubmit} className="space-y-4" noValidate={false}>
-          {(localError || authError) && (
-            <div
-              role="alert"
-              className="p-3 text-xs rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 flex items-start gap-2"
-            >
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{localError || authError}</span>
-            </div>
-          )}
-
-          <div className="space-y-1.5">
-            <label
-              htmlFor="email"
-              className="block text-xs font-medium text-zinc-700 dark:text-zinc-300"
-            >
-              Email address
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="username"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@company.com"
-              className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 transition"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label
-                htmlFor="password"
-                className="block text-xs font-medium text-zinc-700 dark:text-zinc-300"
-              >
-                Password
-              </label>
-            </div>
-            <div className="relative">
-              <input
-                id="password"
-                name="password"
-                type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••••••"
-                className="w-full px-3 py-2 pr-10 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 transition"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1"
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-medium text-sm shadow-sm transition flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            {loading ? (
-              <span>Authenticating...</span>
-            ) : (
-              <>
-                <span>Sign in</span>
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </button>
-        </form>
-        <GoogleSignIn />
-        <p className="text-sm text-center text-zinc-800">
-          New here? <a href="/signup" className="underline font-medium text-indigo-800">Create your own account</a> and pick a role.
-        </p>
-      </div>
-    </div>
-  );
+    {demoMode === null && <p role="status" className="login-demo-loading">Checking demo availability…</p>}
+    {demoMode && <>
+      <section className="login-demo" aria-labelledby="demo-title">
+        <div className="login-demo-heading"><span className="eyebrow">Explore the workspace</span><span className="login-demo-badge">Live demo</span></div>
+        <h2 id="demo-title">Four roles. One considered process.</h2>
+        <p>No setup needed. Choose a role to try the real review workflow.</p>
+        <div className="login-role-grid">{DEMO_ACCOUNTS.map((acc, i) => <button key={acc.role} type="button" onClick={() => demo(acc.role)} disabled={loading} aria-busy={pending === acc.role} className="login-role">
+          <span className="login-role-top"><span className="login-role-number">0{i + 1}</span><ArrowUpRight size={17} /></span>
+          <strong>{acc.label}</strong><span>{pending === acc.role ? "Signing in…" : acc.desc}</span>
+        </button>)}</div>
+        <p className="login-demo-note">Shared GlowLeaf Naturals workspace · Fictional brand.<br />Don’t upload confidential material.</p>
+      </section>
+      <details className="login-walkthrough">
+        <summary><span><span className="eyebrow">Your first review</span><strong>Try it in 2 minutes</strong></span><ChevronDown size={18} /></summary>
+        <ol>
+          <li><strong>Submit.</strong> As Creator, open New content and load the Lip balm launch sample.</li>
+          <li><strong>Check.</strong> Run the review and read the findings and their sources.</li>
+          <li><strong>Decide.</strong> Accept, edit or reject suggestions, save a new version, then submit for review.</li>
+          <li><strong>Approve.</strong> As Brand Manager, comment and escalate. As Authorised Reviewer, approve with a written override reason where required.</li>
+        </ol>
+        <p>Open Insights as Admin to explore recurring findings and unclear guidelines.</p>
+      </details>
+    </>}
+    <p className="login-signature">AI suggests. Humans decide.</p>
+  </div>;
 }

@@ -1,4 +1,10 @@
+"use client";
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
+import type { Health } from "@/lib/types";
 export default function AboutAiPage() {
+  const [health, setHealth] = useState<Health | null>(null);
+  useEffect(() => { api.health().then(setHealth).catch(() => {}); }, []);
   return (
     <div className="max-w-3xl mx-auto p-4 md:p-8 space-y-5 text-zinc-900">
       <h1 className="text-2xl font-bold">About AI in BrandGuard</h1>
@@ -13,10 +19,12 @@ export default function AboutAiPage() {
         <ul className="list-disc pl-5 space-y-1">
           <li>It does not publish, approve or change your content on its own.</li>
           <li>It does not give legal advice. Regulatory findings flag risk; people confirm.</li>
-          <li>It is not trained on your content.</li>
+          <li>It cannot guarantee a claim is correct or that content complies with every applicable rule.</li>
         </ul></section>
       <section><h2 className="font-semibold">Providers and data</h2>
-        <p>By default the hosted model is Google Gemini (model set by <code>LLM_MODEL</code>), with Gemini embeddings (768 dimensions) for retrieval. When enabled, the content being reviewed and the retrieved brand-source excerpts are sent to the provider for that review only. If Gemini is overloaded or out of quota, BrandGuard tries a second Gemini model and then, if configured, a backup provider with its own key (in this deployment Groq, running the open-weight model gpt-oss-120b); the same content and excerpts are sent to whichever provider answers, and each review records which one it was. When no key is set, or every provider fails, BrandGuard falls back to offline rule-based and keyword checks and nothing is sent. Data is stored in Supabase (Postgres, private storage) with row-level security per organisation; the app is hosted on Vercel and Render.</p></section>
+        <p role="status">{!health ? "Provider status is unavailable until the API responds." : health.ai_live ? `Configured review provider: ${health.ai_provider}${health.ai_backup ? `; backup: ${health.ai_backup}` : ""}.` : "Offline rule and heuristic checks are active. No review content is sent to an AI provider in this mode."}</p>
+        <p className="mt-3">When live AI is enabled, submitted text and retrieved approved-source excerpts may be sent to configured providers. If a provider fails, another configured model or backup provider may also receive that content. Each review records the provider/model that answered or indicates offline fallback. Provider data handling depends on the service and account configuration; this app does not guarantee provider retention or training policies.</p>
+        <p className="mt-3">{health?.store === "memory" ? "This server uses seeded in-memory storage. Data resets on restart." : health?.store === "supabase" ? "This server uses Supabase for accounts, database records and uploaded files. API authorization uses the verified account’s role and workspace." : "Storage status has not been confirmed."} The shared demo workspace uses the fictional GlowLeaf Naturals brand. Do not upload confidential material there.</p></section>
       <section><h2 className="font-semibold">Human control and audit</h2>
         <p>Every finding, decision, comment, approval and override is written to an append-only audit log. A reviewer who approves with high-severity issues unresolved must write an override reason.</p></section>
       <p className="text-sm text-zinc-700">The demo brand &ldquo;GlowLeaf Naturals&rdquo; is fictional. See AI_AND_SERVICES.md in the repository for the full list of services, models and libraries.</p>

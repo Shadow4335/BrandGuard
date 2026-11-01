@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { RequireAuth, ErrorNote } from "@/components/RequireAuth";
+import { Loading } from "@/components/Loading";
 import { StatusBadge } from "@/components/Pills";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
@@ -24,6 +25,7 @@ function Queue() {
     <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-4">
       <h1 className="text-2xl font-bold">{heading}</h1>
       <ErrorNote message={error} />
+      {!items && !error && <Loading label="Loading your queue" />}
       {items && items.length === 0 && (
         <p className="rounded-lg border border-dashed border-zinc-400 p-4">
           {role === "creator" ? <>You have no content yet. <Link href="/content/new" className="underline font-medium">Create some</Link>.</>
@@ -36,7 +38,7 @@ function Queue() {
         {(items ?? []).map((i) => (
           <li key={i.content.id} className="p-3 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <Link href={role === "creator" ? `/content/${i.content.id}` : `/reviews/${i.content.id}`} className="font-medium underline">{i.content.title}</Link>
+              <Link href={role === "creator" || role === "admin" ? `/content/${i.content.id}` : `/reviews/${i.content.id}`} className="font-medium underline">{i.content.title}</Link>
               <p className="text-xs text-zinc-700">by {i.creator_name ?? "unknown"} · {i.content.channel.replace("_", " ")} · {plural(i.total_findings, "finding")}{i.open_high ? ` · ${i.open_high} high-severity unresolved` : ""}</p>
             </div>
             <StatusBadge status={i.content.status} />

@@ -69,10 +69,8 @@ class Settings(BaseModel):
 
     @property
     def signup_roles(self) -> list:
-        """Roles people may give themselves at sign-up: creator only by default. Manager, reviewer and admin approve
-        content or edit the shared brand sources, so self-assigning them is opt-in (SIGNUP_ALLOWED_ROLES)."""
-        allowed = {r.strip() for r in os.getenv("SIGNUP_ALLOWED_ROLES", "creator").split(",")}
-        return [r for r in ("creator", "manager", "reviewer", "admin") if r in allowed]
+        """Only Creator can ever be self-assigned without admin authorization."""
+        return ["creator"]
 
     @property
     def role_password(self) -> str:

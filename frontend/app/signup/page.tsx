@@ -7,6 +7,7 @@ import { ErrorNote } from "@/components/RequireAuth";
 import { useAuth } from "@/lib/auth-context";
 import { GoogleSignIn } from "@/components/GoogleSignIn";
 import { api } from "@/lib/api";
+import { PasswordInput } from "@/components/PasswordInput";
 import type { UserRole } from "@/lib/types";
 
 const ROLES: { value: UserRole; label: string; desc: string }[] = [
@@ -22,18 +23,18 @@ export default function SignupPage() {
   const [form, setForm] = useState({ full_name: "", email: "", password: "", role: "creator" as UserRole, invite_code: "", role_password: "" });
   const [busy, setBusy] = useState(false);
   const [local, setLocal] = useState<string | null>(null);
-  const [allowed, setAllowed] = useState<UserRole[]>(["creator"]);
   const [passwordRoles, setPasswordRoles] = useState<UserRole[]>([]);
-  const [mode, setMode] = useState<"open" | "invite" | "closed">("open");
+  const [mode, setMode] = useState<"open" | "invite" | "closed" | "loading">("loading");
+  const [healthError, setHealthError] = useState(false);
   useEffect(() => {
     api.health().then((h) => {
-      if (h.signup_roles?.length) setAllowed(h.signup_roles);
       setPasswordRoles(h.password_roles ?? []);
       if (h.signup) setMode(h.signup);
-    }).catch(() => {});
+    }).catch(() => setHealthError(true));
   }, []);
-  const needsRolePassword = passwordRoles.includes(form.role);
-  const roleChoices = ROLES.filter((r) => allowed.includes(r.value) || passwordRoles.includes(r.value));
+  const needsRolePassword = form.role !== "creator";
+  const roleChoices = ROLES;
+  const configured = !needsRolePassword || passwordRoles.includes(form.role);
   const MIN = 10;
   const left = Math.max(0, MIN - form.password.length);
 
@@ -46,6 +47,7 @@ export default function SignupPage() {
       invite_code: form.invite_code.trim() || undefined,
       role_password: needsRolePassword ? form.role_password : undefined,
     });
+    setForm((f) => ({ ...f, password: "", role_password: "" }));
     setBusy(false);
     if (ok) router.push("/dashboard");
   }
@@ -56,9 +58,10 @@ export default function SignupPage() {
       <h1 className="text-2xl font-bold">Create your account</h1>
       <p className="text-sm text-zinc-800">
         New accounts join the shared <strong>GlowLeaf Naturals</strong> demo workspace, a fictional brand with
-        guidelines, approved facts and sample history already set up. Your account is ready immediately; no email confirmation. Your password is stored only as a salted hash and is never visible to anyone, including us.
+        guidelines, approved facts and sample history already set up. Use a password you don’t use elsewhere, and don’t upload confidential material. Account availability follows this server’s signup policy.
       </p>
       <ErrorNote message={local || error} />
+      {mode === "loading" && <p role="status" className="auth-notice">{healthError ? "Cannot reach the server. Reload to check signup availability." : "Checking signup availability…"}</p>}
       {mode === "closed" && (
         <p role="status" className="rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950">
           Sign-up is closed on this server. Ask an admin to create your account, or <Link href="/login" className="underline">sign in</Link>.
@@ -72,7 +75,7 @@ export default function SignupPage() {
           <input required type="email" autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={input} />
         </label>
         <label className="block text-sm font-medium">Password
-          <input required type="password" minLength={MIN} maxLength={128} autoComplete="new-password" aria-describedby="pw-help" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className={input} />
+          <PasswordInput required minLength={MIN} maxLength={128} autoComplete="new-password" aria-describedby="pw-help" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className={input} />
           <span id="pw-help" className="mt-1 block text-xs font-normal text-zinc-700">
             {left > 0 ? `${left} more character${left === 1 ? "" : "s"} needed. ` : "Long enough. "}A few unrelated words works well. Avoid common passwords, your name or email, and the product name.
           </span>
@@ -86,25 +89,25 @@ export default function SignupPage() {
           <legend className="text-sm font-medium">Your role</legend>
           {roleChoices.map((r) => (
             <label key={r.value} className={`flex items-start gap-2 rounded-lg border p-2 cursor-pointer ${form.role === r.value ? "border-indigo-700 bg-indigo-50" : "border-zinc-300"}`}>
-              <input type="radio" name="role" value={r.value} checked={form.role === r.value} onChange={() => setForm({ ...form, role: r.value })} className="mt-1" />
-              <span><strong className="text-sm">{r.label}</strong>{passwordRoles.includes(r.value) && <span className="ml-1 text-xs text-zinc-600">(admin password)</span>}<br /><span className="text-xs text-zinc-700">{r.desc}</span></span>
+              <input type="radio" name="role" value={r.value} checked={form.role === r.value} onChange={() => { setForm({ ...form, role: r.value, role_password: "" }); setLocal(null); }} className="mt-1" />
+              <span><strong className="text-sm">{r.label}</strong>{r.value !== "creator" && <span className="ml-1 text-xs text-zinc-600">(admin password)</span>}<br /><span className="text-xs text-zinc-700">{r.desc}</span></span>
             </label>
           ))}
-          {roleChoices.length === 1 && <p className="text-xs text-zinc-700">New accounts start as {roleChoices[0].label}. Managers, reviewers and admins approve content or change the shared brand sources, so an admin assigns those roles.</p>}
           {needsRolePassword && (
             <label className="block text-sm font-medium pt-1">Admin password
-              <input required type="password" autoComplete="off" value={form.role_password} onChange={(e) => setForm({ ...form, role_password: e.target.value })} aria-describedby="role-pw-help" className={input} />
+              <PasswordInput label="admin password" required autoComplete="off" value={form.role_password} onChange={(e) => setForm({ ...form, role_password: e.target.value })} aria-describedby="role-pw-help" className={input} />
               <span id="role-pw-help" className="mt-1 block text-xs font-normal text-zinc-700">This role can approve content or change the brand sources, so it needs the password your admin set up.</span>
             </label>
           )}
         </fieldset>
-        <button disabled={busy || mode === "closed"} className="w-full rounded-lg bg-indigo-700 text-white px-4 py-2.5 font-medium disabled:opacity-50">
+        {needsRolePassword && !configured && mode !== "loading" && <p role="status" className="auth-notice">Admin authorization is not configured on this server. Ask your admin to enable elevated-role registration, or choose Creator.</p>}
+        <button disabled={busy || mode === "closed" || mode === "loading" || !configured} className="w-full rounded-lg bg-indigo-700 text-white px-4 py-2.5 font-medium disabled:opacity-50">
           {busy ? "Creating your account..." : "Create account"}
         </button>
       </form>
-      {mode !== "closed" && (
+      {mode !== "closed" && mode !== "loading" && (
         <GoogleSignIn role={form.role} inviteCode={form.invite_code.trim() || undefined}
-          rolePassword={needsRolePassword ? form.role_password : undefined} label="Sign up with Google" />
+          rolePassword={needsRolePassword ? form.role_password : undefined} label="Sign up with Google" disabled={!configured || (needsRolePassword && !form.role_password)} onComplete={() => setForm((f) => ({ ...f, password: "", role_password: "" }))} />
       )}
       <p className="text-sm text-zinc-800">
         Already have an account? <Link href="/login" className="underline font-medium">Sign in</Link>. Want to try every role without an account? Use the one-click demo buttons on the <Link href="/login" className="underline font-medium">sign-in page</Link>.

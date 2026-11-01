@@ -1,19 +1,10 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
-import { GovernanceBanner } from "@/components/GovernanceBanner";
-import { Navbar } from "@/components/Navbar";
+import { AppShell } from "@/components/AppShell";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const inter = Inter({ variable: "--font-inter", subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
   title: "BrandGuard - Pre-publication Brand Governance",
@@ -28,13 +19,12 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      data-scroll-behavior="smooth"
+      className={`${inter.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans">
+      <body className="font-sans">
         <AuthProvider>
-          <GovernanceBanner />
-          <Navbar />
-          <main className="flex-1">{children}</main>
+          <AppShell>{children}</AppShell>
         </AuthProvider>
       </body>
     </html>

@@ -1,3 +1,4 @@
+from app.workflow.state_machine import unresolved_high
 """Content submission, detail, comments, images and sample loader."""
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional
@@ -50,7 +51,16 @@ def get_content_or_404(content_id: str, user: UserContext) -> dict:
 
 
 def names(org_id: str) -> dict:
-    return {p["id"]: p for p in get_store().select("profiles", {"org_id": org_id})}
+    store = get_store()
+    people = {p["id"]: p for p in store.select("profiles", {"org_id": org_id})}
+    try:
+        members = store.select("workspace_memberships", {"org_id": org_id})
+    except Exception:
+        members = []
+    roles = {m["user_id"]: m["role"] for m in members if m["user_id"] not in people}
+    for p in store.select_where_in("profiles", "id", list(roles)):
+        people[p["id"]] = {**p, "role": roles[p["id"]]}
+    return people
 
 
 def queue_cards(items: List[dict], org: str) -> List[QueueItem]:
@@ -76,7 +86,7 @@ def queue_cards(items: List[dict], org: str) -> List[QueueItem]:
     for c in items:
         fs = findings.get(newest_run.get(version_id.get(c["id"])), [])
         cards.append(QueueItem(content=ContentItem(**c), creator_name=(people.get(c.get("creator_id")) or {}).get("full_name"),
-                               open_high=sum(1 for f in fs if f["severity"] == "high" and f["status"] in ("open", "rejected")),
+                               open_high=unresolved_high(fs),
                                total_findings=len(fs)))
     return cards
 
