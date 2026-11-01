@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ErrorNote } from "@/components/RequireAuth";
 import { useAuth } from "@/lib/auth-context";
+import { GoogleSignIn } from "@/components/GoogleSignIn";
 import { api } from "@/lib/api";
 import type { UserRole } from "@/lib/types";
 
@@ -71,6 +72,7 @@ export default function SignupPage() {
           {busy ? "Creating your account..." : "Create account"}
         </button>
       </form>
+      <GoogleSignIn role={form.role} label="Sign up with Google as the role above" />
       <p className="text-sm text-zinc-800">
         Already have an account? <Link href="/login" className="underline font-medium">Sign in</Link>. Want to try every role without an account? Use the one-click demo buttons on the <Link href="/login" className="underline font-medium">sign-in page</Link>.
       </p>

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { GoogleSignIn } from "@/components/GoogleSignIn";
 import { api } from "@/lib/api";
 import { UserRole } from "@/lib/types";
 import {
@@ -230,6 +231,7 @@ export default function LoginPage() {
             )}
           </button>
         </form>
+        <GoogleSignIn />
         <p className="text-sm text-center text-zinc-800">
           New here? <a href="/signup" className="underline font-medium text-indigo-800">Create your own account</a> and pick a role.
         </p>

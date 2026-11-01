@@ -27,6 +27,10 @@ class Store:
     def get(self, table: str, row_id: str, org_id: Optional[str] = None) -> Optional[Row]:
         rows = self.select(table, {"id": row_id, **({"org_id": org_id} if org_id else {})}, limit=1)
         return rows[0] if rows else None
+    def select_where_in(self, table: str, column: str, values: List[Any], order: Optional[str] = None,
+                        desc: bool = False) -> List[Row]:
+        """All rows whose `column` matches one of `values`, in one query rather than one per value."""
+        ...
     def insert(self, table: str, row: Row) -> Row: ...
     def insert_many(self, table: str, rows: List[Row]) -> List[Row]:
         return [self.insert(table, r) for r in rows]
@@ -50,6 +54,14 @@ class MemoryStore(Store):
                 rows = sorted(rows, key=lambda r: (r.get(order) is None, r.get(order)), reverse=desc)
             rows = rows[:limit] if limit else rows
             return copy.deepcopy(rows)
+
+    def select_where_in(self, table, column, values, order=None, desc=False):
+        keep = set(values)
+        with self.lock:
+            rows = [r for r in self.tables.get(table, []) if r.get(column) in keep]
+        if order:
+            rows.sort(key=lambda r: (r.get(order) is None, r.get(order)), reverse=desc)
+        return copy.deepcopy(rows)
 
     def insert(self, table, row):
         with self.lock:
@@ -77,10 +89,21 @@ class MemoryStore(Store):
 
 
 class SupabaseStore(Store):
+    IN_BATCH = 100  # values per IN (...) filter, keeping the request URL short
+
     def __init__(self) -> None:
-        from supabase import create_client
-        s = get_settings()
-        self.client = create_client(s.supabase_url, s.supabase_service_key)
+        self._per_thread = threading.local()
+
+    @property
+    def client(self):
+        """A client per thread. FastAPI runs sync endpoints on a thread pool, and one shared HTTP/2 client fails under
+        parallel requests (httpx ReadError, errno 35)."""
+        client = getattr(self._per_thread, "client", None)
+        if client is None:
+            from supabase import create_client
+            s = get_settings()
+            client = self._per_thread.client = create_client(s.supabase_url, s.supabase_service_key)
+        return client
 
     def select(self, table, where=None, order=None, desc=False, limit=None):
         q = self.client.table(table).select("*")
@@ -91,6 +114,17 @@ class SupabaseStore(Store):
         if limit:
             q = q.limit(limit)
         return q.execute().data or []
+
+    def select_where_in(self, table, column, values, order=None, desc=False):
+        values, rows = list(dict.fromkeys(values)), []
+        for i in range(0, len(values), self.IN_BATCH):
+            q = self.client.table(table).select("*").in_(column, values[i:i + self.IN_BATCH])
+            if order:
+                q = q.order(order, desc=desc)
+            rows.extend(q.execute().data or [])
+        if order and len(values) > self.IN_BATCH:  # several batches: restore one overall order
+            rows.sort(key=lambda r: (r.get(order) is None, r.get(order)), reverse=desc)
+        return rows
 
     def insert(self, table, row):
         return self.client.table(table).insert(row).execute().data[0]

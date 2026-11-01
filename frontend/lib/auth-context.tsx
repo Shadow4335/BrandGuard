@@ -5,6 +5,7 @@ import { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase";
 import { Profile, UserRole } from "@/lib/types";
 import { api, getDemoSession, setDemoSession, DemoSession } from "@/lib/api";
+import { signInWithGooglePopup } from "@/lib/firebase";
 
 const DEMO_ROLES: Record<string, UserRole> = {
   "admin@demo.test": "admin",
@@ -27,6 +28,7 @@ interface AuthContextType {
   error: string | null;
   signIn: (email: string, password: string) => Promise<boolean>;
   signInDemo: (role: UserRole) => Promise<boolean>;
+  signInWithGoogle: (role?: UserRole) => Promise<boolean>;
   signUp: (input: { email: string; password: string; full_name: string; role: UserRole }) => Promise<boolean>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -39,6 +41,7 @@ const AuthContext = createContext<AuthContextType>({
   error: null,
   signIn: async () => false,
   signInDemo: async () => false,
+  signInWithGoogle: async () => false,
   signUp: async () => false,
   signOut: async () => {},
   refreshProfile: async () => {},
@@ -202,6 +205,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  /** Google sign-in through Firebase. The API checks the Firebase token and returns a BrandGuard session; `role` is
+   *  only used when this is the person's first sign-in. */
+  const signInWithGoogle = async (role?: UserRole): Promise<boolean> => {
+    setError(null);
+    try {
+      const idToken = await signInWithGooglePopup();
+      if (!idToken) return false; // closed the popup
+      setLoading(true);
+      const res = await api.googleLogin(idToken, role);
+      if (res.mode === "memory" && res.session) {
+        setDemoSession(res.session);
+        const st = demoToState(res.session);
+        setUser(st.user); setProfile(st.profile); setLoading(false);
+        return true;
+      }
+      setDemoSession(null);
+      const { data, error: sessionError } = await supabase.auth.setSession({
+        access_token: res.access_token ?? "", refresh_token: res.refresh_token ?? "",
+      });
+      if (sessionError || !data.user) {
+        setError(sessionError?.message ?? "Google sign-in failed. Please try again.");
+        setLoading(false);
+        return false;
+      }
+      setUser(data.user);
+      if (res.profile) setProfile(res.profile); // sent with the session: no second lookup
+      else await fetchProfile(data.user.id);
+      setLoading(false);
+      return true;
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Google sign-in failed. Please try again.");
+      setLoading(false);
+      return false;
+    }
+  };
+
   const signUp = async (input: { email: string; password: string; full_name: string; role: UserRole }): Promise<boolean> => {
     setError(null);
     setLoading(true);
@@ -248,6 +287,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error,
         signIn,
         signInDemo,
+        signInWithGoogle,
         signUp,
         signOut,
         refreshProfile,

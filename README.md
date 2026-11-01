@@ -51,6 +51,16 @@ Tests (offline, no keys): `cd backend && python -m pytest -q`.
 2. Copy `backend/.env.example` to `backend/.env`; set `SUPABASE_*`, `LLM_API_KEY`, and `MOCK_LLM=false`. Copy `frontend/.env.example` to `frontend/.env.local`.
 3. Seed users, brand sources and 30 days of history (idempotent): `backend/.venv/bin/python seed/seed_demo.py`.
 
+### Google sign-in (optional, Firebase)
+
+Firebase only confirms who the person is. The API checks the Firebase ID token, finds the BrandGuard account with that verified Google email (or creates one on first sign-in, with the role picked on the sign-up page) and returns a normal session, so roles and workspaces work as before. The "Continue with Google" button stays hidden until both sides are configured.
+
+1. [Firebase console](https://console.firebase.google.com) → create a project → *Authentication* → *Sign-in method* → enable **Google**.
+2. *Authentication* → *Settings* → *Authorized domains*: `localhost` is there by default; add your Vercel domain.
+3. *Project settings* → *Your apps* → add a **Web** app; put its `apiKey`, `authDomain`, `projectId` and `appId` in `frontend/.env.local` as the four `NEXT_PUBLIC_FIREBASE_*` values.
+4. Set `FIREBASE_PROJECT_ID` (same project ID) in `backend/.env`. No service-account key is needed.
+5. Restart both servers.
+
 ### Environment variables
 
 | Variable | Where | Purpose |
@@ -66,6 +76,8 @@ Tests (offline, no keys): `cd backend && python -m pytest -q`.
 | `DEMO_USER_PASSWORD` | backend/seed | secret password of the four demo accounts; only the server uses it. Set a long random value and run `seed/rotate_demo_passwords.py` |
 | `DEMO_MODE` | backend | `true` (default) enables the one-click demo accounts; `false` leaves only real accounts and hides the demo buttons |
 | `SIGNUP_ALLOWED_ROLES` | backend | roles a person may pick at sign-up (default `creator,manager,reviewer`; admin is left out on purpose) |
+| `FIREBASE_PROJECT_ID` | backend | turns on Google sign-in; ID tokens must come from this Firebase project |
+| `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `NEXT_PUBLIC_FIREBASE_APP_ID` | frontend | Firebase web app config for the Google popup (public values) |
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_API_URL` | frontend | public config |
 
 Secrets live only in environment variables; `.env*` files are git-ignored.

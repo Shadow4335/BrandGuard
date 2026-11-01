@@ -59,6 +59,8 @@ class Settings(BaseModel):
     demo_password: str = os.getenv("DEMO_USER_PASSWORD") or "BrandGuard2026!"  # an empty value also means the default
     # One-click demo accounts. DEMO_MODE=false leaves a deployment with real accounts only.
     demo_mode: bool = _flag("DEMO_MODE", "true")
+    # Google sign-in through Firebase: only the project ID is needed to check ID tokens. Empty = off.
+    firebase_project_id: str = os.getenv("FIREBASE_PROJECT_ID", "").strip()
     tesseract_cmd: str = os.getenv("TESSERACT_CMD", "")
     port: int = int(os.getenv("PORT", "8000"))
 

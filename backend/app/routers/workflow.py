@@ -6,10 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.audit import log_event
 from app.auth import UserContext, get_current_user
 from app.engine.pipeline import latest_findings
-from app.models import ContentItem
 from app.models.api import AuditOut, ContentDetail, QueueItem, TransitionIn
 from app.models.enums import UserRole
-from app.routers.content import build_detail, get_content_or_404, latest_version, names
+from app.routers.content import build_detail, get_content_or_404, latest_version, names, queue_cards
 from app.store import get_store
 from app.workflow.state_machine import TransitionError, apply_transition
 
@@ -48,14 +47,7 @@ def queue(user: UserContext = Depends(get_current_user)):
         rows = [r for r in rows if r.get("creator_id") == str(user.user_id)]
     else:
         rows = [r for r in rows if r["status"] in wanted]
-    people = names(org)
-    out = []
-    for r in rows:
-        fs = latest_findings(latest_version(r)["id"])
-        out.append(QueueItem(content=ContentItem(**r), creator_name=(people.get(r.get("creator_id")) or {}).get("full_name"),
-                             open_high=sum(1 for f in fs if f["severity"] == "high" and f["status"] in ("open", "rejected")),
-                             total_findings=len(fs)))
-    return out
+    return queue_cards(rows, org)
 
 
 @router.get("/audit", response_model=List[AuditOut])

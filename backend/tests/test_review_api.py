@@ -114,3 +114,17 @@ def test_insights_are_seeded_and_flag_unclear_rule():
     assert "RULE-TONE-HYPE" in {u["rule_id"] for u in unclear}
     hype = next(r for r in s["most_overridden"] if r["rule_id"] == "RULE-TONE-HYPE")
     assert hype["override_rate"] >= 0.5
+
+
+def test_list_and_queue_read_each_table_once(monkeypatch):
+    """Content list and review queue batch their reads instead of querying per item."""
+    from app.store import get_store
+    store, reads = get_store(), []
+    select, select_in = store.select, store.select_where_in
+    monkeypatch.setattr(store, "select", lambda t, *a, **k: reads.append(t) or select(t, *a, **k))
+    monkeypatch.setattr(store, "select_where_in", lambda t, *a, **k: reads.append(t) or select_in(t, *a, **k))
+    for role, path in (("creator", "/api/content"), ("admin", "/api/content"), ("manager", "/api/reviews/queue")):
+        token = c.post("/api/auth/demo-login", json={"role": role}).json()["token"]
+        reads.clear()
+        assert c.get(path, headers={"Authorization": "Bearer " + token}).status_code == 200
+        assert all(reads.count(t) <= 1 for t in ("content_versions", "review_runs", "findings")), reads
