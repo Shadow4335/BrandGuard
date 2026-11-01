@@ -43,7 +43,8 @@ def health():
                      ai_live=s.llm_available, ai_backup=s.llm_backup_provider if s.llm_backup_ready else "", store="supabase" if s.use_supabase else "memory",
                      version=s.app_version, commit=os.getenv("RENDER_GIT_COMMIT", "local")[:7],
                      demo_mode=s.demo_mode, signup_roles=s.signup_roles,
-                     firebase_enabled=bool(s.firebase_project_id), signup=_signup_mode())
+                     firebase_enabled=bool(s.firebase_project_id), signup=_signup_mode(),
+                     password_roles=s.password_roles)
 
 
 @router.get("/me")
@@ -132,6 +133,24 @@ def _signup_workspace(invite_code: Optional[str]) -> str:
     return os.getenv("SIGNUP_ORG_ID") or ORG_ID
 
 
+def _check_signup_role(role: str, role_password: Optional[str]) -> bool:
+    """Whether this role may be self-assigned. Creator (and anything in SIGNUP_ALLOWED_ROLES) is open; manager,
+    reviewer and admin need the admin password. Returns True when the admin password was used. Call it after the
+    sign-up rate limit, so wrong passwords count toward it and can't be guessed quickly."""
+    s = get_settings()
+    if role not in ROLES:
+        raise HTTPException(400, "Choose a role.")
+    if role in s.signup_roles:
+        return False
+    if role in s.password_roles:
+        if not role_password:
+            raise HTTPException(403, "That role needs the admin password. Ask an admin for it, or sign up as a Creator.")
+        if not secrets.compare_digest(role_password.encode(), s.role_password.encode()):
+            raise HTTPException(403, "That admin password isn't right.")
+        return True
+    raise HTTPException(403, "New accounts start as Creator. Ask an admin if you need another role.")
+
+
 def _rate_limit(request: Request) -> None:
     _throttle(_signups, request, SIGNUP_LIMIT, "Too many sign-ups from this network. Please wait a few minutes and try again.")
 
@@ -153,9 +172,8 @@ def signup(body: SignupIn, request: Request):
         raise HTTPException(400, problem)
     if body.role not in ROLES:
         raise HTTPException(400, "Choose a role.")
-    if body.role not in get_settings().signup_roles:
-        raise HTTPException(403, "New accounts start as Creator. Ask an admin if you need another role.")
     _rate_limit(request)
+    with_password = _check_signup_role(body.role, body.role_password)
     org = _signup_workspace(body.invite_code)
 
     s, store = get_settings(), get_store()
@@ -164,7 +182,7 @@ def signup(body: SignupIn, request: Request):
             raise HTTPException(409, "An account with this email already exists. Sign in instead.")
         p = store.insert("profiles", {"id": str(uuid.uuid4()), "org_id": org, "role": body.role, "email": email,
                                       "full_name": name, "pw": _stored_hash(body.password)})
-        log_event(org, p["id"], "user_signed_up", "profile", p["id"], {"role": body.role})
+        log_event(org, p["id"], "user_signed_up", "profile", p["id"], {"role": body.role, "admin_password": with_password})
         return SignupOut(email=email, role=body.role, mode="memory", session=_session(p))
 
     client = store.client  # type: ignore[attr-defined]
@@ -188,7 +206,7 @@ def signup(body: SignupIn, request: Request):
         except Exception:
             pass
         raise HTTPException(502, "We couldn't finish setting up your account. Please try again.")
-    log_event(org, uid, "user_signed_up", "profile", uid, {"role": body.role})
+    log_event(org, uid, "user_signed_up", "profile", uid, {"role": body.role, "admin_password": with_password})
     return SignupOut(email=email, role=body.role, mode="supabase")
 
 
@@ -260,6 +278,7 @@ def google_login(body: GoogleLoginIn, request: Request):
         raise HTTPException(403, "That address is reserved for the demo accounts.")
     name = (claims.get("name") or email.split("@")[0]).strip()[:80]
     default_role = "creator" if "creator" in s.signup_roles else (s.signup_roles or ["creator"])[0]
+    with_password = False
     role = body.role or default_role
 
     def find_profile():
@@ -270,12 +289,11 @@ def google_login(body: GoogleLoginIn, request: Request):
         profile = find_profile()
         created = profile is None
         if created:
-            if role not in s.signup_roles:
-                raise HTTPException(403, "New accounts start as Creator. Ask an admin if you need another role.")
+            with_password = _check_signup_role(role, body.role_password)
             org = _signup_workspace(body.invite_code)
             profile = store.insert("profiles", {"id": str(uuid.uuid4()), "org_id": org, "role": role,
                                                 "email": email, "full_name": name})
-            log_event(org, profile["id"], "user_signed_up", "profile", profile["id"], {"role": role, "via": "google"})
+            log_event(org, profile["id"], "user_signed_up", "profile", profile["id"], {"role": role, "via": "google", "admin_password": with_password})
         return GoogleLoginOut(mode="memory", created=created, session=_session(profile))
 
     admin = store.client.auth.admin  # type: ignore[attr-defined]
@@ -295,8 +313,7 @@ def google_login(body: GoogleLoginIn, request: Request):
 
     created = profile is None
     if created:
-        if role not in s.signup_roles:
-            raise HTTPException(403, "New accounts start as Creator. Ask an admin if you need another role.")
+        with_password = _check_signup_role(role, body.role_password)
         org = _signup_workspace(body.invite_code)
         meta = {"full_name": name, "role": role, "firebase_uid": claims.get("sub")}
         try:
@@ -321,7 +338,7 @@ def google_login(body: GoogleLoginIn, request: Request):
             except Exception:
                 pass
             raise HTTPException(502, "We couldn't finish setting up your account. Please try again.")
-        log_event(org, uid, "user_signed_up", "profile", uid, {"role": role, "via": "google"})
+        log_event(org, uid, "user_signed_up", "profile", uid, {"role": role, "via": "google", "admin_password": with_password})
         early_link = None  # an early link for a brand-new user may be a sign-up link: make a fresh magic link
 
     try:

@@ -21,6 +21,7 @@ class HealthOut(BaseModel):
     signup_roles: list = ["creator", "manager", "reviewer"]  # roles a new account may pick
     firebase_enabled: bool = False  # Google sign-in (Firebase) is set up on this server
     signup: str = "open"         # "open", "invite" (an invite code is needed) or "closed"
+    password_roles: list = []    # roles that can be chosen at sign-up with the admin password
 
 
 class DemoLoginIn(BaseModel):
@@ -33,12 +34,14 @@ class SignupIn(BaseModel):
     full_name: str
     role: str = "creator"
     invite_code: Optional[str] = None  # needed when the server has no shared sign-up workspace (see SIGNUP_INVITE_CODE)
+    role_password: Optional[str] = None  # admin password, needed for manager / reviewer / admin
 
 
 class GoogleLoginIn(BaseModel):
     id_token: str                  # Firebase ID token from the Google popup
     role: Optional[str] = None     # only used if this sign-in creates the account
     invite_code: Optional[str] = None  # likewise
+    role_password: Optional[str] = None  # likewise: admin password for manager / reviewer / admin
 
 
 class GoogleLoginOut(BaseModel):

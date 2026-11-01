@@ -28,8 +28,8 @@ interface AuthContextType {
   error: string | null;
   signIn: (email: string, password: string) => Promise<boolean>;
   signInDemo: (role: UserRole) => Promise<boolean>;
-  signInWithGoogle: (role?: UserRole, inviteCode?: string) => Promise<boolean>;
-  signUp: (input: { email: string; password: string; full_name: string; role: UserRole; invite_code?: string }) => Promise<boolean>;
+  signInWithGoogle: (role?: UserRole, inviteCode?: string, rolePassword?: string) => Promise<boolean>;
+  signUp: (input: { email: string; password: string; full_name: string; role: UserRole; invite_code?: string; role_password?: string }) => Promise<boolean>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -207,13 +207,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   /** Google sign-in through Firebase. The API checks the Firebase token and returns a BrandGuard session; `role` is
    *  only used when this is the person's first sign-in. */
-  const signInWithGoogle = async (role?: UserRole, inviteCode?: string): Promise<boolean> => {
+  const signInWithGoogle = async (role?: UserRole, inviteCode?: string, rolePassword?: string): Promise<boolean> => {
     setError(null);
     try {
       const idToken = await signInWithGooglePopup();
       if (!idToken) return false; // closed the popup
       setLoading(true);
-      const res = await api.googleLogin(idToken, role, inviteCode || undefined);
+      const res = await api.googleLogin(idToken, role, inviteCode || undefined, rolePassword || undefined);
       if (res.mode === "memory" && res.session) {
         setDemoSession(res.session);
         const st = demoToState(res.session);
@@ -259,7 +259,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (input: { email: string; password: string; full_name: string; role: UserRole; invite_code?: string }): Promise<boolean> => {
+  const signUp = async (input: { email: string; password: string; full_name: string; role: UserRole; invite_code?: string; role_password?: string }): Promise<boolean> => {
     setError(null);
     setLoading(true);
     try {

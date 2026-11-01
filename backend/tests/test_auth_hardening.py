@@ -208,3 +208,53 @@ def test_rate_limit_memory_is_bounded_and_empty_entries_are_dropped(monkeypatch)
     monkeypatch.setattr(core.time, "time", lambda: 10**12)  # every entry has expired
     core.throttle(bucket, req, 5, "slow down", key="10.0.0.24")
     assert len(bucket[("10.0.0.24")]) == 1  # the expired timestamps were dropped, not counted
+
+
+# --- manager / reviewer / admin at sign-up with the admin password ---
+
+ROLE_PW = "orchid-ledger-7731-quiet"
+
+
+def signup_as(role, role_password=None, headers=None):
+    return c.post("/api/auth/signup", headers=headers or {},
+                  json={"email": new_email(), "password": STRONG, "full_name": "Asha Verma", "role": role,
+                        **({"role_password": role_password} if role_password is not None else {})})
+
+
+@pytest.fixture
+def role_password(monkeypatch):
+    monkeypatch.setenv("PRIVILEGED_SIGNUP_PASSWORD", ROLE_PW)
+
+
+def test_privileged_roles_need_the_admin_password(role_password):
+    assert c.get("/api/health").json()["password_roles"] == ["manager", "reviewer", "admin"]
+    for role in ("manager", "reviewer", "admin"):
+        core._signups.clear()
+        missing = signup_as(role)
+        assert missing.status_code == 403 and "admin password" in missing.json()["detail"]
+        wrong = signup_as(role, "not-the-password-123")
+        assert wrong.status_code == 403 and "isn't right" in wrong.json()["detail"]
+        ok = signup_as(role, ROLE_PW)
+        assert ok.status_code == 200 and ok.json()["session"]["role"] == role
+    core._signups.clear()
+    assert signup_as("creator").status_code == 200  # creators never need it
+
+
+def test_admin_password_use_is_recorded(role_password):
+    from app.store import get_store
+    r = signup_as("reviewer", ROLE_PW)
+    uid = r.json()["session"]["user_id"]
+    events = [e for e in get_store().select("audit_log") if e.get("target_id") == uid and e["event_type"] == "user_signed_up"]
+    assert events and events[0]["details"]["admin_password"] is True
+
+
+def test_wrong_admin_passwords_are_rate_limited(role_password):
+    codes = [signup_as("admin", f"guess-number-{i:04d}").status_code for i in range(7)]
+    assert codes[:5] == [403] * 5 and 429 in codes[5:]
+
+
+def test_privileged_signup_is_off_without_a_strong_admin_password(monkeypatch):
+    monkeypatch.setenv("PRIVILEGED_SIGNUP_PASSWORD", "short")  # under 12 characters: ignored
+    assert c.get("/api/health").json()["password_roles"] == []
+    r = signup_as("manager", "short")
+    assert r.status_code == 403 and "start as Creator" in r.json()["detail"]

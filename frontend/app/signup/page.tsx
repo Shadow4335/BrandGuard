@@ -19,17 +19,21 @@ const ROLES: { value: UserRole; label: string; desc: string }[] = [
 export default function SignupPage() {
   const router = useRouter();
   const { signUp, error } = useAuth();
-  const [form, setForm] = useState({ full_name: "", email: "", password: "", role: "creator" as UserRole, invite_code: "" });
+  const [form, setForm] = useState({ full_name: "", email: "", password: "", role: "creator" as UserRole, invite_code: "", role_password: "" });
   const [busy, setBusy] = useState(false);
   const [local, setLocal] = useState<string | null>(null);
   const [allowed, setAllowed] = useState<UserRole[]>(["creator"]);
+  const [passwordRoles, setPasswordRoles] = useState<UserRole[]>([]);
   const [mode, setMode] = useState<"open" | "invite" | "closed">("open");
   useEffect(() => {
     api.health().then((h) => {
       if (h.signup_roles?.length) setAllowed(h.signup_roles);
+      setPasswordRoles(h.password_roles ?? []);
       if (h.signup) setMode(h.signup);
     }).catch(() => {});
   }, []);
+  const needsRolePassword = passwordRoles.includes(form.role);
+  const roleChoices = ROLES.filter((r) => allowed.includes(r.value) || passwordRoles.includes(r.value));
   const MIN = 10;
   const left = Math.max(0, MIN - form.password.length);
 
@@ -37,7 +41,11 @@ export default function SignupPage() {
     e.preventDefault();
     if (form.password.length < MIN) { setLocal(`Use a password with at least ${MIN} characters.`); return; }
     setLocal(null); setBusy(true);
-    const ok = await signUp({ ...form, invite_code: form.invite_code.trim() || undefined });
+    const ok = await signUp({
+      ...form,
+      invite_code: form.invite_code.trim() || undefined,
+      role_password: needsRolePassword ? form.role_password : undefined,
+    });
     setBusy(false);
     if (ok) router.push("/dashboard");
   }
@@ -76,20 +84,27 @@ export default function SignupPage() {
         )}
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium">Your role</legend>
-          {ROLES.filter((r) => allowed.includes(r.value)).map((r) => (
+          {roleChoices.map((r) => (
             <label key={r.value} className={`flex items-start gap-2 rounded-lg border p-2 cursor-pointer ${form.role === r.value ? "border-indigo-700 bg-indigo-50" : "border-zinc-300"}`}>
               <input type="radio" name="role" value={r.value} checked={form.role === r.value} onChange={() => setForm({ ...form, role: r.value })} className="mt-1" />
-              <span><strong className="text-sm">{r.label}</strong><br /><span className="text-xs text-zinc-700">{r.desc}</span></span>
+              <span><strong className="text-sm">{r.label}</strong>{passwordRoles.includes(r.value) && <span className="ml-1 text-xs text-zinc-600">(admin password)</span>}<br /><span className="text-xs text-zinc-700">{r.desc}</span></span>
             </label>
           ))}
-          {allowed.length === 1 && <p className="text-xs text-zinc-700">New accounts start as {ROLES.find((r) => r.value === allowed[0])?.label ?? allowed[0]}. Managers, reviewers and admins approve content or change the shared brand sources, so an admin assigns those roles.</p>}
+          {roleChoices.length === 1 && <p className="text-xs text-zinc-700">New accounts start as {roleChoices[0].label}. Managers, reviewers and admins approve content or change the shared brand sources, so an admin assigns those roles.</p>}
+          {needsRolePassword && (
+            <label className="block text-sm font-medium pt-1">Admin password
+              <input required type="password" autoComplete="off" value={form.role_password} onChange={(e) => setForm({ ...form, role_password: e.target.value })} aria-describedby="role-pw-help" className={input} />
+              <span id="role-pw-help" className="mt-1 block text-xs font-normal text-zinc-700">This role can approve content or change the brand sources, so it needs the password your admin set up.</span>
+            </label>
+          )}
         </fieldset>
         <button disabled={busy || mode === "closed"} className="w-full rounded-lg bg-indigo-700 text-white px-4 py-2.5 font-medium disabled:opacity-50">
           {busy ? "Creating your account..." : "Create account"}
         </button>
       </form>
       {mode !== "closed" && (
-        <GoogleSignIn role={form.role} inviteCode={form.invite_code.trim() || undefined} label="Sign up with Google" />
+        <GoogleSignIn role={form.role} inviteCode={form.invite_code.trim() || undefined}
+          rolePassword={needsRolePassword ? form.role_password : undefined} label="Sign up with Google" />
       )}
       <p className="text-sm text-zinc-800">
         Already have an account? <Link href="/login" className="underline font-medium">Sign in</Link>. Want to try every role without an account? Use the one-click demo buttons on the <Link href="/login" className="underline font-medium">sign-in page</Link>.

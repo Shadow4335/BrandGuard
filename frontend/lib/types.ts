@@ -330,4 +330,5 @@ export interface Health {
   signup_roles?: UserRole[];  // roles a new account may pick
   firebase_enabled?: boolean; // Google sign-in (Firebase) is set up on the server
   signup?: "open" | "invite" | "closed"; // whether people can create their own accounts
+  password_roles?: UserRole[];  // roles that can be chosen at sign-up with the admin password
 }

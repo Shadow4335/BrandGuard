@@ -37,6 +37,9 @@ def backup_provider(name: str, key: str) -> str:
     return name
 
 
+MIN_ROLE_PASSWORD = 12
+
+
 class Settings(BaseModel):
     app_name: str = "BrandGuard API"
     app_version: str = "0.2.0"
@@ -70,6 +73,20 @@ class Settings(BaseModel):
         content or edit the shared brand sources, so self-assigning them is opt-in (SIGNUP_ALLOWED_ROLES)."""
         allowed = {r.strip() for r in os.getenv("SIGNUP_ALLOWED_ROLES", "creator").split(",")}
         return [r for r in ("creator", "manager", "reviewer", "admin") if r in allowed]
+
+    @property
+    def role_password(self) -> str:
+        """Admin-set password that unlocks manager, reviewer and admin at sign-up (PRIVILEGED_SIGNUP_PASSWORD). Ignored
+        if shorter than MIN_ROLE_PASSWORD, so a weak value can't open those roles to guessing."""
+        pw = os.getenv("PRIVILEGED_SIGNUP_PASSWORD", "").strip()
+        return pw if len(pw) >= MIN_ROLE_PASSWORD else ""
+
+    @property
+    def password_roles(self) -> list:
+        """Roles that can be chosen at sign-up with the admin password (those not already open to everyone)."""
+        if not self.role_password:
+            return []
+        return [r for r in ("manager", "reviewer", "admin") if r not in self.signup_roles]
 
     @property
     def use_supabase(self) -> bool:
