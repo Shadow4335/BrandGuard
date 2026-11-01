@@ -61,6 +61,11 @@ Firebase only confirms who the person is. The API checks the Firebase ID token, 
 4. Set `FIREBASE_PROJECT_ID` (same project ID) in `backend/.env`. No service-account key is needed.
 5. Restart both servers.
 
+**Production (needed for Safari):** Safari blocks storage for the sign-in iframe when it comes from `<project>.firebaseapp.com`, so on the deployed site Firebase's sign-in pages are served from the app's own domain (`/__/auth/*` is proxied in `frontend/next.config.ts`).
+
+1. Google Cloud console → APIs & Services → Credentials → the "Web client (auto created by Google Service)" OAuth client → *Authorized redirect URIs*: add `https://<your-vercel-domain>/__/auth/handler`.
+2. On Vercel set `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` to `<your-vercel-domain>` (no `https://`) and redeploy. Locally keep `<project>.firebaseapp.com`.
+
 ### Environment variables
 
 | Variable | Where | Purpose |
