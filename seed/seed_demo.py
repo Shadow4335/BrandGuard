@@ -68,7 +68,7 @@ def main() -> None:
     if not store.get("content_items", _id("hist-c0")):
         seed_history(store, ORG_ID, ids["history"], ids["manager"], ids["reviewer"])
         print("seeded 25 historical content items")
-    print("Done. Demo password:", s.demo_password)
+    print("Done. (The demo password comes from DEMO_USER_PASSWORD and is never printed.)")
 
 
 if __name__ == "__main__":

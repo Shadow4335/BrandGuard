@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { RequireAuth, ErrorNote } from "@/components/RequireAuth";
+import { Loading } from "@/components/Loading";
 import { api } from "@/lib/api";
 import type { InsightsSummary, UnclearRule } from "@/lib/types";
 
@@ -21,13 +22,24 @@ function Insights() {
     api.insights().then(setS).catch((e) => setError(e.message));
     api.unclear().then(setUnclear).catch(() => {});
   }, []);
-  if (!s) return <div className="p-8">{error ? <ErrorNote message={error} /> : "Loading insights..."}</div>;
-  const short = (t: string) => (t.length > 26 ? t.slice(0, 25) + "…" : t);
+  if (!s) return error ? <div className="p-8"><ErrorNote message={error} /></div> : <Loading label="Loading insights" />;
+  const short = (t: string) => (t.length > 30 ? t.slice(0, 29) + "…" : t);
+  const stats: [string, string][] = [
+    ["Findings", String(s.total_findings)],
+    ["Content items", String(s.total_content)],
+    ["Override approvals", `${s.override_approvals} of ${s.approvals_total}`],
+    ["Override rate", s.approvals_total ? `${Math.round((100 * s.override_approvals) / s.approvals_total)}%` : "n/a"],
+  ];
 
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-6">
       <h1 className="text-2xl font-bold">Insights</h1>
-      <p className="text-zinc-800">Last 30 days. {s.total_findings} findings across {s.total_content} content items. {s.override_approvals} of {s.approvals_total} approvals were overrides.</p>
+      <p className="text-sm text-zinc-700">Last 30 days</p>
+      <dl className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {stats.map(([label, value]) => (
+          <div key={label} className={card}><dt className="text-xs uppercase tracking-wide text-zinc-600">{label}</dt><dd className="text-2xl font-bold mt-1">{value}</dd></div>
+        ))}
+      </dl>
 
       <section aria-labelledby="unclear-h" className="rounded-xl border-2 border-amber-500 bg-amber-50 p-4 space-y-2">
         <h2 id="unclear-h" className="font-semibold">Guidelines that may be unclear</h2>
@@ -48,7 +60,7 @@ function Insights() {
           <h2 id="top-h" className="font-semibold mb-2">Most frequently violated rules</h2>
           <div className="h-72" role="img" aria-label="Bar chart of findings per rule">
             <ResponsiveContainer><BarChart data={s.top_rules.map((r) => ({ ...r, name: short(r.title) }))} layout="vertical" margin={{ left: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" /><XAxis type="number" allowDecimals={false} /><YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12 }} />
+              <CartesianGrid strokeDasharray="3 3" /><XAxis type="number" allowDecimals={false} /><YAxis type="category" dataKey="name" width={170} tick={{ fontSize: 11 }} />
               <Tooltip /><Bar dataKey="count" fill="#4338ca" name="Findings" />
             </BarChart></ResponsiveContainer>
           </div>

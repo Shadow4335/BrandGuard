@@ -13,9 +13,11 @@ c = TestClient(app, raise_server_exceptions=False)
 @pytest.fixture(autouse=True)
 def reset_rate_limit():
     from app.routers import core
-    core._signups.clear()
+    for bucket in (core._signups, core._logins, core._demos):
+        bucket.clear()
     yield
-    core._signups.clear()
+    for bucket in (core._signups, core._logins, core._demos):
+        bucket.clear()
 
 
 def new_email():
@@ -53,7 +55,7 @@ def test_login_after_signup_and_wrong_password():
 
 
 def test_each_role_can_sign_up_and_is_enforced():
-    for role in ["admin", "manager", "reviewer"]:
+    for role in ["manager", "reviewer"]:  # admin isn't self-service by default (see test_auth_hardening)
         r = signup(new_email(), role=role)
         h = {"Authorization": "Bearer " + r.json()["session"]["token"]}
         created = c.post("/api/content", headers=h, data={"title": "t", "text": "hello you"})

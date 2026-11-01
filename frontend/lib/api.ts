@@ -78,8 +78,10 @@ export const api = {
     const res = await fetch(`${API_BASE}/api/health`);
     return parse<Health>(res);
   },
+  demoSession: (role: string) => call<{ access_token: string; refresh_token: string }>("POST", "/api/auth/demo-session", { role }),
   demoLogin: (role: string) => call<DemoSession>("POST", "/api/auth/demo-login", { role }),
   login: (email: string, password: string) => call<DemoSession>("POST", "/api/auth/login", { email, password }),
+  me: () => call<{ user_id: string; email: string; org_id: string; role: string; full_name?: string | null }>("GET", "/api/me"),
   signup: (body: { email: string; password: string; full_name: string; role: string }) =>
     call<{ email: string; role: string; mode: "supabase" | "memory"; session?: DemoSession | null }>("POST", "/api/auth/signup", body),
 

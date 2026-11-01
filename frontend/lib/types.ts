@@ -326,4 +326,6 @@ export interface Health {
   ai_backup?: string;
   fallback_available: boolean;
   store: "supabase" | "memory";
+  demo_mode?: boolean;        // the one-click demo accounts are on
+  signup_roles?: UserRole[];  // roles a new account may pick
 }

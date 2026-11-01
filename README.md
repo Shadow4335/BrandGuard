@@ -9,7 +9,7 @@
 
 ## Try it in 2 minutes (no walkthrough needed)
 
-The demo brand is **GlowLeaf Naturals**, a fictional Indian personal-care brand. On the login page click a role; the password for every account is `BrandGuard2026!`.
+The demo brand is **GlowLeaf Naturals**, a fictional Indian personal-care brand. On the login page click a role: the demo accounts sign in with one click (the server signs them in, so there is no password to type or find). See [SECURITY.md](SECURITY.md) for how accounts and passwords are protected.
 
 1. **Creator** → *New content* → **Load sample 1** → *Submit for AI review*. Highlighted issues appear with Issue, Why, rule/source chip, Fix, Severity and Confidence. Click a source chip to read the approved excerpt.
 2. **Accept** two suggestions, **Edit** one, **Reject** one (with a reason) → *Save as new version* → the diff shows exactly those changes.
@@ -20,7 +20,7 @@ The demo brand is **GlowLeaf Naturals**, a fictional Indian personal-care brand.
 
 Sample 2 is an influencer post (missing #Ad and AI label); sample 3 is a poster image (contrast and missing alt-text); sample 4 is clean.
 
-**Your own account:** click *Sign up* (top right or under the login form), pick a role, and you're in. No email confirmation. New accounts join the shared GlowLeaf Naturals demo workspace, so brand sources and sample history are already there. To see the whole workflow with one account, use the role switcher (it signs you in as the demo users).
+**Your own account:** click *Sign up* (top right or under the login form), pick a role (Creator, Manager or Reviewer), and you're in. Passwords need 10+ characters and are checked on the server. No email confirmation. New accounts join the shared GlowLeaf Naturals demo workspace, so brand sources and sample history are already there. Admin accounts can't be self-created; use the one-click Admin demo. To see the whole workflow, use the demo role switcher (shown only while signed in as a demo user) or sign out and pick another demo role.
 
 **Supported uploads (up to 10 MB):** PDF (scanned PDFs are read with OCR, first 5 pages), Word `.docx` (pictures without alt-text are flagged), images PNG/JPG/WEBP/GIF/BMP/TIFF (OCR, contrast and alt-text checks; add alt-text later from the content page), TXT/Markdown, and HTML (`<img>` without alt is flagged). Old `.doc`, HEIC, PowerPoint and other files get a clear message asking for a supported format.
 
@@ -63,7 +63,9 @@ Tests (offline, no keys): `cd backend && python -m pytest -q`.
 | `SIGNUP_ORG_ID` | backend only | optional: workspace new sign-ups join (defaults to the GlowLeaf demo org) |
 | `EMBED_MODEL`, `EMBED_DIM` | backend | embeddings (768) |
 | `ALLOWED_ORIGINS` | backend | CORS (add the Vercel URL) |
-| `DEMO_USER_PASSWORD` | backend/seed | password for demo accounts |
+| `DEMO_USER_PASSWORD` | backend/seed | secret password of the four demo accounts; only the server uses it. Set a long random value and run `seed/rotate_demo_passwords.py` |
+| `DEMO_MODE` | backend | `true` (default) enables the one-click demo accounts; `false` leaves only real accounts and hides the demo buttons |
+| `SIGNUP_ALLOWED_ROLES` | backend | roles a person may pick at sign-up (default `creator,manager,reviewer`; admin is left out on purpose) |
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_API_URL` | frontend | public config |
 
 Secrets live only in environment variables; `.env*` files are git-ignored.

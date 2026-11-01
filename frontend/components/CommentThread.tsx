@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { formatWhen } from "@/lib/utils";
 import type { ContentDetail } from "@/lib/types";
 
 export function CommentThread({ detail, onChange }: { detail: ContentDetail; onChange: () => void }) {
@@ -18,7 +19,7 @@ export function CommentThread({ detail, onChange }: { detail: ContentDetail; onC
       {detail.comments.length === 0 && <p className="text-sm text-zinc-700">No comments yet.</p>}
       <ul className="space-y-2">
         {detail.comments.map((c) => (
-          <li key={c.id} className="rounded-lg bg-zinc-100 p-2 text-sm"><strong>{c.author_name ?? "Someone"}</strong> <span className="text-zinc-700 text-xs">{c.created_at?.slice(0, 16).replace("T", " ")}</span><br />{c.text}</li>
+          <li key={c.id} className="rounded-lg bg-zinc-100 p-2 text-sm"><strong>{c.author_name ?? "Someone"}</strong> <span className="text-zinc-700 text-xs">{formatWhen(c.created_at)}</span><br />{c.text}</li>
         ))}
       </ul>
       {err && <p role="alert" className="text-sm text-red-800">{err}</p>}

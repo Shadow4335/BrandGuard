@@ -6,6 +6,7 @@ import { RequireAuth, ErrorNote } from "@/components/RequireAuth";
 import { StatusBadge } from "@/components/Pills";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
+import { plural } from "@/lib/utils";
 import type { QueueItem, UserRole } from "@/lib/types";
 
 const STEPS: Record<UserRole, { text: string; href: string; done: (c: QueueItem[]) => boolean }[]> = {
@@ -76,7 +77,7 @@ function Dashboard() {
           {(items ?? []).slice(0, 8).map((i) => (
             <li key={i.content.id} className="p-3 flex items-center justify-between gap-3">
               <Link href={profile.role === "creator" || profile.role === "admin" ? `/content/${i.content.id}` : `/reviews/${i.content.id}`} className="font-medium underline">{i.content.title}</Link>
-              <span className="flex items-center gap-2"><span className="text-xs text-zinc-700">{i.total_findings} findings</span><StatusBadge status={i.content.status} /></span>
+              <span className="flex items-center gap-2"><span className="text-xs text-zinc-700">{plural(i.total_findings, "finding")}</span><StatusBadge status={i.content.status} /></span>
             </li>
           ))}
         </ul>

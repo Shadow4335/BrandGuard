@@ -17,6 +17,8 @@ class HealthOut(BaseModel):
     store: str
     version: str = ""
     commit: str = ""
+    demo_mode: bool = True       # the one-click demo accounts are on
+    signup_roles: list = ["creator", "manager", "reviewer"]  # roles a new account may pick
 
 
 class DemoLoginIn(BaseModel):
@@ -40,6 +42,12 @@ class SignupOut(BaseModel):
     role: str
     mode: str                      # "supabase": sign in with Supabase next; "memory": token below
     session: Optional["DemoLoginOut"] = None
+
+
+class DemoSessionOut(BaseModel):
+    """A demo user's Supabase session, created on the server so the demo password never reaches the browser."""
+    access_token: str
+    refresh_token: str
 
 
 class DemoLoginOut(BaseModel):

@@ -25,7 +25,8 @@ interface AuthContextType {
   profile: Profile | null;
   loading: boolean;
   error: string | null;
-  signIn: (email: string, password?: string) => Promise<boolean>;
+  signIn: (email: string, password: string) => Promise<boolean>;
+  signInDemo: (role: UserRole) => Promise<boolean>;
   signUp: (input: { email: string; password: string; full_name: string; role: UserRole }) => Promise<boolean>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -37,6 +38,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   error: null,
   signIn: async () => false,
+  signInDemo: async () => false,
   signUp: async () => false,
   signOut: async () => {},
   refreshProfile: async () => {},
@@ -58,16 +60,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (profError) {
-        // Fallback: check user metadata for role if profile query fails or table empty
+        // Reading the profile directly failed, so ask the API: it decides role and workspace. Never take the role
+        // from user_metadata, which signed-in users can edit themselves.
         const authUser = (await supabase.auth.getUser()).data.user;
-        const role = (authUser?.user_metadata?.role as UserRole) || "creator";
-        setProfile({
-          id: userId,
-          org_id: "demo-org-id",
-          role: role,
-          email: authUser?.email,
-          full_name: authUser?.user_metadata?.full_name || authUser?.email?.split("@")[0],
-        });
+        try {
+          const me = await api.me();
+          setProfile({ id: userId, org_id: me.org_id, role: me.role as UserRole, email: me.email, full_name: me.full_name ?? undefined });
+        } catch {
+          setProfile({ id: userId, org_id: "", role: "creator", email: authUser?.email, full_name: authUser?.email?.split("@")[0] });
+        }
       } else if (data) {
         setProfile(data as Profile);
       }
@@ -121,7 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [supabase]);
 
-  const signIn = async (email: string, password = "BrandGuard2026!"): Promise<boolean> => {
+  const signIn = async (email: string, password: string): Promise<boolean> => {
     setError(null);
     setLoading(true);
     try {
@@ -163,6 +164,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Authentication failed";
       setError(msg);
+      setLoading(false);
+      return false;
+    }
+  };
+
+  /** One-click demo account. The server signs the demo user in, so the browser never holds a demo password. */
+  const signInDemo = async (role: UserRole): Promise<boolean> => {
+    setError(null);
+    setLoading(true);
+    try {
+      let offline = false;
+      try { offline = (await api.health()).store === "memory"; } catch { /* server still waking: use the hosted path */ }
+      if (offline) {
+        const d = await api.demoLogin(role);
+        setDemoSession(d);
+        const st = demoToState(d);
+        setUser(st.user); setProfile(st.profile); setLoading(false);
+        return true;
+      }
+      setDemoSession(null);
+      const tokens = await api.demoSession(role);
+      const { data, error: sessionError } = await supabase.auth.setSession(tokens);
+      if (sessionError || !data.user) {
+        setError(sessionError?.message ?? "Demo sign-in failed. Please try again.");
+        setLoading(false);
+        return false;
+      }
+      setUser(data.user);
+      await fetchProfile(data.user.id);
+      setLoading(false);
+      return true;
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Demo sign-in failed. Please try again.");
       setLoading(false);
       return false;
     }
@@ -213,6 +247,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         error,
         signIn,
+        signInDemo,
         signUp,
         signOut,
         refreshProfile,
