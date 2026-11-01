@@ -13,6 +13,7 @@ export function GoogleSignIn({ role, label = "Continue with Google" }: { role?: 
   const { signInWithGoogle } = useAuth();
   const [available, setAvailable] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [prepared, setPrepared] = useState(false);
 
   useEffect(() => {
     if (!firebaseConfigured) return;
@@ -20,7 +21,9 @@ export function GoogleSignIn({ role, label = "Continue with Google" }: { role?: 
       .then((h) => {
         if (!h.firebase_enabled) return;
         setAvailable(true);
-        loadFirebase().catch(() => {}); // ready before the click, so the popup isn't blocked
+        // Enable the button once Firebase is fully loaded, so the click opens the popup straight away. If loading
+        // fails, enable it anyway: the click then retries the load (and the popup may be blocked, with a clear message).
+        loadFirebase().catch(() => {}).finally(() => setPrepared(true));
       })
       .catch(() => {});
   }, []);
@@ -38,11 +41,12 @@ export function GoogleSignIn({ role, label = "Continue with Google" }: { role?: 
     <button
       type="button"
       onClick={onClick}
-      disabled={busy}
+      disabled={busy || !prepared}
+      aria-busy={!prepared || busy}
       className="w-full py-2.5 px-4 rounded-lg border border-zinc-300 bg-white hover:bg-zinc-50 text-zinc-900 font-medium text-sm shadow-sm transition flex items-center justify-center gap-2 disabled:opacity-50"
     >
       <GoogleLogo />
-      <span>{busy ? "Signing in with Google..." : label}</span>
+      <span>{busy ? "Signing in with Google..." : prepared ? label : "Preparing Google sign-in..."}</span>
     </button>
   );
 }

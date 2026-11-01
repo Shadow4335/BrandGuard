@@ -12,17 +12,39 @@ const firebaseConfig = {
 export const firebaseConfigured = Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId);
 
 type FirebaseAuth = { auth: Auth; sdk: typeof import("firebase/auth") };
+type PopupResolver = { _initialize?: (auth: Auth) => Promise<unknown> };
+
+/** On desktop Chrome, Firefox and Edge, Firebase only downloads its sign-in iframe (from the authDomain) once
+ *  signInWithPopup is called, and opens the window after that finishes. If the download is slow, the browser no longer
+ *  counts the click and blocks the popup. Firebase already does this step early on Safari and mobile; there is no
+ *  public API for it, so make the same internal call. If a future SDK drops it, sign-in still works as before. */
+async function preparePopup(auth: Auth) {
+  try {
+    await auth.authStateReady();
+    const resolver = (auth as unknown as { _popupRedirectResolver?: PopupResolver })._popupRedirectResolver;
+    await resolver?._initialize?.(auth);
+  } catch {
+    /* not fatal: signInWithPopup will try again on the click */
+  }
+}
 let ready: FirebaseAuth | null = null;
 let pending: Promise<FirebaseAuth> | null = null;
 
-/** Load the SDK before the click. A browser only allows a popup opened directly by a click, so nothing can be awaited
- *  between the click and signInWithPopup: call this as soon as the Google button is shown. */
+/** Get everything ready before the click. A browser only allows a popup opened directly by a click, so no network
+ *  work may happen between the click and the window opening: call this as soon as the Google button is shown. */
 export function loadFirebase(): Promise<FirebaseAuth> {
-  pending ??= Promise.all([import("firebase/app"), import("firebase/auth")]).then(([appSdk, sdk]) => {
-    const app = appSdk.getApps()[0] ?? appSdk.initializeApp(firebaseConfig);
-    ready = { auth: sdk.getAuth(app), sdk };
-    return ready;
-  });
+  pending ??= Promise.all([import("firebase/app"), import("firebase/auth")])
+    .then(async ([appSdk, sdk]) => {
+      const app = appSdk.getApps()[0] ?? appSdk.initializeApp(firebaseConfig);
+      const auth = sdk.getAuth(app);
+      await preparePopup(auth);
+      ready = { auth, sdk };
+      return ready;
+    })
+    .catch((e) => {
+      pending = null; // let a later call try again
+      throw e;
+    });
   return pending;
 }
 
