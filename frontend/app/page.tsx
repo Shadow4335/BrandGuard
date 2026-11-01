@@ -34,7 +34,7 @@ export default function HomePage() {
   const destination = user ? "/dashboard" : "/signup";
   return <>
     <SilverWaves className="hero">
-      <div className="hero-meta"><span>Pre-publication brand governance</span><span>Rules · Context · Judgment</span></div>
+      <div className="hero-meta"><span>Pre-publication brand governance</span></div>
       <section aria-label={`Introduction slide ${slide + 1} of 3`} aria-roledescription="carousel" tabIndex={0} onKeyDown={(e) => {
         if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); const d = e.key === "ArrowRight" ? 1 : -1; change(slide + d, d); }
       }} onTouchStart={(e) => { touch.current = e.touches[0].clientX; }} onTouchEnd={(e) => { if (touch.current !== null) { const dx = e.changedTouches[0].clientX - touch.current; if (Math.abs(dx) > 50) change(slide + (dx < 0 ? 1 : -1), dx < 0 ? 1 : -1); touch.current = null; } }}>
