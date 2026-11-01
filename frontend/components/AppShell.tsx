@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useLayoutEffect, useRef } from "react";
+import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowUpRight, BookOpen, ChartNoAxesCombined, ClipboardList, Info, LayoutDashboard, LogOut, Plus, ShieldCheck } from "lucide-react";
@@ -10,6 +10,7 @@ import { RoleSwitcher } from "./RoleSwitcher";
 import { GovernanceBanner } from "./GovernanceBanner";
 import { ButtonEffects } from "./ButtonEffects";
 import { MotionControl } from "./MotionControl";
+import { PublicNav } from "./PublicNav";
 import { SilverWaves } from "./SilverWaves";
 
 const LINKS = [
@@ -30,6 +31,15 @@ function Shell({ children }: { children: React.ReactNode }) {
   const publicInfo = path === "/about-ai" && !user;
   const workspace = !auth && !publicInfo && path !== "/";
   const previous = useRef(path), page = useRef<HTMLDivElement>(null);
+  // Over the hero the public header is see-through; once the page scrolls it becomes a solid, blurred bar
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    if (workspace) return;
+    const update = () => setScrolled(window.scrollY > 8);
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    return () => window.removeEventListener("scroll", update);
+  }, [workspace]);
   useLayoutEffect(() => {
     const order = ["/", "/login", "/signup", ...LINKS.map((l) => l.href)];
     const index = (p: string) => order.findIndex((r) => r === p);
@@ -53,7 +63,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         <div className="sidebar-bottom">{profile && <><p className="profile-name">{profile.full_name || profile.email}</p><p className="profile-role">{profile.role === "manager" ? "Brand Manager" : profile.role === "reviewer" ? "Authorised Reviewer" : profile.role}</p><RoleSwitcher /></>}<p className="sidebar-tagline">AI suggests. Humans decide.</p></div>
       </aside>
       <div className="app-topbar"><span>Workspace <span className="breadcrumb-slash">/</span> {LINKS.find((l) => l.href === path)?.label || "Content review"}</span><div><MotionControl /><Link href="/about-ai" aria-label="About AI"><Info size={18} /></Link>{user && <button onClick={() => signOut()}><LogOut size={16} />Sign out</button>}</div></div>
-    </> : <header className="public-header"><Link href="/" aria-label="BrandGuard home"><BrandLogo /></Link><nav aria-label="Main"><Link href="/#process">The process</Link><Link href="/#standards">Brand standards</Link><Link href="/about-ai">About AI</Link></nav><div><MotionControl />{!loading && user ? <Link className="pill-button" href="/dashboard">Dashboard <ArrowUpRight size={16} /></Link> : <><Link href="/login">Sign in</Link><Link className="pill-button" href="/signup">Get started <ArrowUpRight size={16} /></Link></>}</div></header>}
+    </> : <header className={`public-header${scrolled ? " is-scrolled" : ""}`}><Link href="/" aria-label="BrandGuard home" className="public-logo"><BrandLogo /></Link><PublicNav /><div className="public-actions"><MotionControl />{!loading && user ? <Link className="pill-button" href="/dashboard">Dashboard <ArrowUpRight size={16} /></Link> : <><Link href="/login" className="public-signin">Sign in</Link><Link className="pill-button" href="/signup">Get started <ArrowUpRight size={16} /></Link></>}</div></header>}
     {auth && <SilverWaves className="auth-art"><div><p className="eyebrow">A considered perspective</p><h2>Your brand.<br /><em>In good hands.</em></h2><p>Every word. Every claim. Considered.</p><p>AI suggests. Humans decide.</p></div></SilverWaves>}
     <main id="main-content" className={workspace ? "app-main" : auth ? "auth-main" : publicInfo ? "public-info-main" : "marketing-main"}><GovernanceBanner /><div ref={page} className="route-content" key={auth ? path : profile ? `${profile.id}:${profile.org_id}:${profile.role}` : "anonymous"}>{children}</div></main>
     {workspace && <footer className="app-footer">BrandGuard <span>AI suggests. Humans decide.</span><Link href="/about-ai">Responsible by design ↗</Link></footer>}

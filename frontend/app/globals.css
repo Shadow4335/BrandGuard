@@ -164,3 +164,26 @@ html[data-reduce-motion] .silver-wave-canvas { display:none; }
 .login-demo-loading { font-size:12px; color:var(--muted-light); margin-top:24px; }
 @media(max-width:760px) { .auth-main .login-form,.login-demo { padding:24px 20px; }.login-role-grid { gap:10px; }.login-role { padding:14px 12px; }.login-role strong { font-size:13px; }.login-role>span:last-child { font-size:12px; }.login-demo h2 { font-size:21px; }.login-heading { margin-bottom:24px; } }
 @media(max-width:360px) { .login-role-grid { grid-template-columns:1fr; }.login-role { min-height:140px; } }
+
+/* Public header: the kit's silver nav, with pill navigation (same capsule and glide as the standards tabs) */
+.marketing-shell .public-header { position:fixed; background:linear-gradient(rgba(36,38,41,.55),rgba(36,38,41,0)); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); border-bottom-color:rgba(255,255,255,.09); transition:background .3s var(--ease),border-color .3s var(--ease),backdrop-filter .3s var(--ease); }
+.marketing-shell .public-header.is-scrolled { background:rgba(23,25,27,.91); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border-bottom-color:var(--border-dark); }
+.public-header .public-logo .brand-logo { font-size:22px; letter-spacing:-.04em; color:#f4f4ef; }
+.public-nav-pill { position:absolute; left:50%; transform:translateX(-50%); }
+.nav-pill-track { position:relative; display:inline-flex; padding:5px; border-radius:999px; border:1px solid rgba(255,255,255,.14); background:rgba(23,25,28,.42); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); box-shadow:inset 0 1px 0 #ffffff0d; isolation:isolate; }
+.nav-pill-track ul { display:flex; gap:2px; list-style:none; margin:0; padding:0; }
+.nav-pill-track a { position:relative; z-index:1; display:flex; align-items:center; min-height:40px; padding:0 18px; border-radius:999px; font-size:13px; color:#c8ccc5; white-space:nowrap; transition:color .2s var(--ease); }
+.nav-pill-track a.is-highlighted,.nav-pill-track a[aria-current] { color:var(--text-dark); }
+.nav-pill-track a:focus-visible { outline:2px solid var(--silver); outline-offset:2px; }
+.nav-pill-capsule { position:absolute; top:5px; bottom:5px; left:0; z-index:0; border-radius:999px; background:linear-gradient(120deg,#434b43,#303831); border:1px solid #64705e66; box-shadow:inset 0 1px 0 #ffffff10; transition:transform .55s var(--ease-slide),width .55s var(--ease-slide),opacity .2s var(--ease); pointer-events:none; }
+.nav-pill-capsule.is-instant { transition:opacity .2s var(--ease); }
+.public-header .public-actions { display:flex; align-items:center; gap:20px; font-size:13px; }
+.public-signin { display:inline-flex; align-items:center; min-height:44px; padding:0 4px; color:#e2e3df; transition:color .15s var(--ease); }
+.public-signin:hover { color:#fff; }
+.public-header .pill-button { min-height:44px; padding:10px 16px 10px 22px; gap:18px; font-weight:400; background:#eceee8; color:#1a1c1d; border:1px solid rgba(255,255,255,.38); transition:background .18s var(--ease),box-shadow .18s var(--ease); }
+.public-header .pill-button:hover { background:#fff; box-shadow:0 4px 22px #0002; }
+.public-header .motion-control { min-height:36px; padding:0 14px; border-radius:999px; border:1px solid rgba(255,255,255,.16); font-size:12px; color:#cfd3cd; opacity:1; transition:border-color .15s var(--ease),color .15s var(--ease); }
+.public-header .motion-control:hover { border-color:rgba(255,255,255,.32); color:#fff; }
+@media(max-width:1199px) { .public-nav-pill { position:static; transform:none; }.nav-pill-track a { padding:0 14px; } }
+@media(max-width:999px) { .public-nav-pill { display:none; } }
+@media(max-width:760px) { .public-header .public-logo .brand-logo { font-size:21px; }.public-header .public-actions { gap:10px; }.public-header .motion-control { font-size:0; min-height:40px; width:40px; padding:0; flex-shrink:0; }.public-header .pill-button { padding:10px 14px 10px 18px; gap:10px; } }
