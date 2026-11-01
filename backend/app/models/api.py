@@ -17,6 +17,9 @@ class HealthOut(BaseModel):
     store: str
     version: str = ""
     commit: str = ""
+    demo_mode: bool = True       # the one-click demo accounts are on
+    signup_roles: list = ["creator", "manager", "reviewer"]  # roles a new account may pick
+    firebase_enabled: bool = False  # Google sign-in (Firebase) is set up on this server
 
 
 class DemoLoginIn(BaseModel):
@@ -30,6 +33,21 @@ class SignupIn(BaseModel):
     role: str = "creator"
 
 
+class GoogleLoginIn(BaseModel):
+    id_token: str                  # Firebase ID token from the Google popup
+    role: Optional[str] = None     # only used if this sign-in creates the account
+
+
+class GoogleLoginOut(BaseModel):
+    """"supabase": session tokens to hand to supabase-js. "memory": an offline-mode session."""
+    mode: str
+    created: bool = False
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
+    session: Optional["DemoLoginOut"] = None
+    profile: Optional[Dict[str, Any]] = None  # so the browser doesn't have to look it up again
+
+
 class LoginIn(BaseModel):
     email: str
     password: str
@@ -40,6 +58,12 @@ class SignupOut(BaseModel):
     role: str
     mode: str                      # "supabase": sign in with Supabase next; "memory": token below
     session: Optional["DemoLoginOut"] = None
+
+
+class DemoSessionOut(BaseModel):
+    """A demo user's Supabase session, created on the server so the demo password never reaches the browser."""
+    access_token: str
+    refresh_token: str
 
 
 class DemoLoginOut(BaseModel):
@@ -178,3 +202,4 @@ class InsightsSummary(BaseModel):
 
 
 SignupOut.model_rebuild()
+GoogleLoginOut.model_rebuild()

@@ -1,4 +1,7 @@
-from typing import Optional
+import hashlib
+import threading
+import time
+from typing import Dict, Optional, Tuple
 from uuid import UUID
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -9,6 +12,35 @@ from app.store import get_store
 from app.models.enums import UserRole
 
 security = HTTPBearer(auto_error=True)
+
+# Recently verified Supabase tokens. Checking a token costs two Supabase round trips (auth + profile), which made every
+# API call slow; reusing the result for a short time is safe because tokens are short-lived anyway. A role change or a
+# removed profile takes effect within TOKEN_CACHE_TTL seconds.
+TOKEN_CACHE_TTL, TOKEN_CACHE_SIZE = 60, 2000
+_token_cache: Dict[str, Tuple[float, "UserContext"]] = {}
+_token_lock = threading.Lock()
+
+
+def _digest(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()  # keep hashes, not bearer tokens, in memory
+
+
+def cache_user(token: str, user: "UserContext", token_expires_at: Optional[float] = None) -> None:
+    """Remember a verified token for TOKEN_CACHE_TTL seconds, or until the token expires if that is sooner."""
+    now = time.time()
+    until = min(now + TOKEN_CACHE_TTL, token_expires_at or float("inf"))
+    with _token_lock:
+        if len(_token_cache) >= TOKEN_CACHE_SIZE:
+            stale = [k for k, (t, _) in _token_cache.items() if t <= now]
+            for k in stale or list(_token_cache)[: TOKEN_CACHE_SIZE // 2]:
+                del _token_cache[k]
+        _token_cache[_digest(token)] = (until, user)
+
+
+def cached_user(token: str) -> Optional["UserContext"]:
+    with _token_lock:
+        entry = _token_cache.get(_digest(token))
+    return entry[1] if entry and entry[0] > time.time() else None
 
 
 class UserContext(BaseModel):
@@ -50,6 +82,9 @@ async def get_current_user(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Your session expired. Please sign in again.",
                             headers={"WWW-Authenticate": "Bearer"})
 
+    hit = cached_user(token)
+    if hit:
+        return hit
     try:
         # Verify the token with Supabase Auth; no local JWT secret is needed.
         auth_response = store.client.auth.get_user(token)  # type: ignore[attr-defined]
@@ -63,7 +98,9 @@ async def get_current_user(
     profile = store.get("profiles", user.id)
     if not profile:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "No BrandGuard profile exists for this account. Ask an admin.")
-    return _context_from_profile(profile, user.email or "")
+    context = _context_from_profile(profile, user.email or "")
+    cache_user(token, context)
+    return context
 
 
 def require_roles(*allowed_roles: UserRole):

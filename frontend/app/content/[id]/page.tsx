@@ -9,6 +9,7 @@ import { FindingCard } from "@/components/FindingCard";
 import { DiffPane } from "@/components/DiffPane";
 import { CommentThread } from "@/components/CommentThread";
 import { AuditTrail } from "@/components/AuditTrail";
+import { Loading } from "@/components/Loading";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import type { ContentDetail, Finding, FindingStatus, Source } from "@/lib/types";
@@ -45,7 +46,7 @@ function ContentView() {
   }, [d?.has_image, d?.content.current_version, id]);
 
   const runReview = useCallback(async () => {
-    setRunning(true); setError(null); setNotice(null); setProgress(["Starting review..."]);
+    setRunning(true); setError(null); setNotice(null); setProgress([]);
     try {
       await api.reviewStream(id, (ev) => {
         if (ev.stage === "error") setError(ev.message);
@@ -66,7 +67,12 @@ function ContentView() {
   }, [d, profile, runReview]);
 
   const cur = d?.versions.find((v) => v.version_number === d.content.current_version);
-  const findings = useMemo(() => d?.findings ?? [], [d]);
+  // Reading order (then severity), so cards don't jump around when a decision is saved
+  const findings = useMemo(() => {
+    const rank = { high: 0, medium: 1, low: 2 } as const;
+    return [...(d?.findings ?? [])].sort((a, b) =>
+      (a.span?.start ?? 1e9) - (b.span?.start ?? 1e9) || rank[a.severity] - rank[b.severity] || a.id.localeCompare(b.id));
+  }, [d]);
   const isOwner = profile?.role === "creator";
   const editable = !!d && isOwner && ["draft", "checked", "changes_requested", "rejected", "approved"].includes(d.content.status);
   const decidedCount = findings.filter((f) => f.status === "accepted" || f.status === "edited").length;
@@ -85,11 +91,16 @@ function ContentView() {
     catch (e) { setError((e as Error).message); }
   }
   async function submitForReview() {
-    try { setError(null); setD(await api.transition(id, "submit")); setTick((t) => t + 1); }
+    try {
+      setError(null); setD(await api.transition(id, "submit")); setTick((t) => t + 1);
+      const stillOpen = openHigh ? ` ${openHigh} high-severity ${openHigh === 1 ? "finding is" : "findings are"} still open, and the manager and reviewer will see that.` : "";
+      setNotice(`Submitted for manager review.${stillOpen} Editing is locked until a decision comes back; this page will show it.`);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
     catch (e) { setError((e as Error).message); }
   }
 
-  if (!d || !cur) return <div className="p-8">{error ? <ErrorNote message={error} /> : "Loading..."}</div>;
+  if (!d || !cur) return error ? <div className="p-8"><ErrorNote message={error} /></div> : <Loading label="Loading content" />;
   const prev = d.versions.find((v) => v.version_number === (cmpA ?? d.content.current_version - 1));
 
   return (
@@ -108,7 +119,7 @@ function ContentView() {
       {notice && <p role="status" className="rounded-lg border border-amber-400 bg-amber-50 text-amber-950 p-3 text-sm">{notice}</p>}
       {running && (
         <ol aria-live="polite" className="rounded-lg border border-indigo-300 bg-indigo-50 p-3 text-sm space-y-1">
-          {progress.map((p, i) => <li key={i}>{i === progress.length - 1 ? "⏳" : "✔"} {p}</li>)}
+          {(progress.length ? progress : ["Starting review..."]).map((p, i, all) => <li key={i}>{i === all.length - 1 ? "⏳" : "✔"} {p}</li>)}
         </ol>
       )}
       {d.latest_run?.used_fallback && !running && !notice && (
@@ -152,7 +163,8 @@ function ContentView() {
         </section>
 
         <section aria-labelledby="findings-h" className="space-y-3">
-          <h2 id="findings-h" className="font-semibold">Findings ({findings.length})</h2>
+          <h2 id="findings-h" className="font-semibold">Findings ({running ? "checking…" : findings.length})</h2>
+          {running && findings.length === 0 && <p className="rounded-lg border border-dashed border-indigo-300 bg-indigo-50 p-4 text-sm">Your findings appear here as soon as the checks finish, usually within 30 seconds.</p>}
           {findings.length === 0 && !running && (
             <p className="rounded-lg border border-dashed border-zinc-400 p-4">
               {d.latest_run ? "No issues found. This looks on-brand." : "No review yet. Click Run AI review to check this against your brand sources."}
@@ -167,7 +179,7 @@ function ContentView() {
           {editable && findings.length > 0 && (
             <div className="rounded-lg border border-zinc-300 bg-white p-3 flex flex-wrap items-center gap-3">
               <button onClick={saveVersion} disabled={decidedCount === 0} className="rounded-lg bg-emerald-700 text-white px-4 py-2 text-sm font-medium disabled:opacity-50">Save as new version</button>
-              <span className="text-sm text-zinc-800">{decidedCount} accepted/edited · {openHigh} high-severity still open</span>
+              <span className="text-sm text-zinc-800">{decidedCount === 0 ? "Accept or edit a suggestion to enable saving. " : ""}{decidedCount} accepted/edited · {openHigh} high-severity still open</span>
             </div>
           )}
         </section>

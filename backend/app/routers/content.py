@@ -44,6 +44,31 @@ def names(org_id: str) -> dict:
     return {p["id"]: p for p in get_store().select("profiles", {"org_id": org_id})}
 
 
+def queue_cards(items: List[dict], org: str) -> List[QueueItem]:
+    """Cards for the content list and review queue, with finding counts from each item's latest review. Each table is
+    read once for all items: Supabase round trips are slow, and three queries per item made the dashboard take seconds."""
+    store = get_store()
+    people = names(org)
+    wanted = {(c["id"], c["current_version"]) for c in items}
+    version_id = {v["content_item_id"]: v["id"]
+                  for v in store.select_where_in("content_versions", "content_item_id", [c["id"] for c in items])
+                  if (v["content_item_id"], v["version_number"]) in wanted}
+    newest_run: dict = {}
+    for run in store.select_where_in("review_runs", "content_version_id", list(version_id.values()),
+                                     order="created_at", desc=True):
+        newest_run.setdefault(run["content_version_id"], run["id"])
+    findings: dict = {}
+    for f in store.select_where_in("findings", "run_id", list(newest_run.values())):
+        findings.setdefault(f["run_id"], []).append(f)
+    cards = []
+    for c in items:
+        fs = findings.get(newest_run.get(version_id.get(c["id"])), [])
+        cards.append(QueueItem(content=ContentItem(**c), creator_name=(people.get(c.get("creator_id")) or {}).get("full_name"),
+                               open_high=sum(1 for f in fs if f["severity"] == "high" and f["status"] in ("open", "rejected")),
+                               total_findings=len(fs)))
+    return cards
+
+
 def latest_version(content: dict) -> dict:
     vs = get_store().select("content_versions", {"content_item_id": content["id"], "version_number": content["current_version"]})
     return vs[0]
@@ -127,16 +152,7 @@ def list_content(user: UserContext = Depends(get_current_user)):
     where = {"org_id": org}
     if user.role == UserRole.CREATOR:
         where["creator_id"] = str(user.user_id)
-    rows = store.select("content_items", where, order="created_at", desc=True)
-    people = names(org)
-    out = []
-    for r in rows:
-        v = store.select("content_versions", {"content_item_id": r["id"], "version_number": r["current_version"]})
-        fs = latest_findings(v[0]["id"]) if v else []
-        out.append(QueueItem(content=ContentItem(**r), creator_name=(people.get(r.get("creator_id")) or {}).get("full_name"),
-                             open_high=sum(1 for f in fs if f["severity"] == "high" and f["status"] in ("open", "rejected")),
-                             total_findings=len(fs)))
-    return out
+    return queue_cards(store.select("content_items", where, order="created_at", desc=True), org)
 
 
 @router.get("/content/{content_id}", response_model=ContentDetail)

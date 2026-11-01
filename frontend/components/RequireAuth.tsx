@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { Loading } from "@/components/Loading";
 
 /** Redirects to /login when signed out; renders children once a profile is loaded. */
 export function RequireAuth({ children, roles }: { children: React.ReactNode; roles?: string[] }) {
@@ -11,7 +12,7 @@ export function RequireAuth({ children, roles }: { children: React.ReactNode; ro
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
   }, [loading, user, router]);
-  if (loading || !user || !profile) return <p className="p-8 text-zinc-700">Loading your workspace...</p>;
+  if (loading || !user || !profile) return <Loading label="Loading your workspace" />;
   if (roles && !roles.includes(profile.role)) {
     return (
       <div className="max-w-xl mx-auto p-8">

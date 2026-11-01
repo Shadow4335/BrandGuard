@@ -27,6 +27,9 @@ def announce() -> None:
     import os
     print(f"BrandGuard API {settings.app_version} commit={os.getenv('RENDER_GIT_COMMIT', 'local')[:7]} "
           f"store={'supabase' if settings.use_supabase else 'memory'} ai_live={settings.llm_available}", flush=True)
+    if settings.use_supabase and settings.demo_mode and settings.demo_password == "BrandGuard2026!":
+        print("WARNING: DEMO_MODE is on and DEMO_USER_PASSWORD is still the published default. "
+              "Set a long random value and run seed/rotate_demo_passwords.py.", flush=True)
 
 
 @app.exception_handler(Exception)

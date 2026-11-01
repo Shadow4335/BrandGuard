@@ -10,6 +10,7 @@ import { CommentThread } from "@/components/CommentThread";
 import { AuditTrail } from "@/components/AuditTrail";
 import { DiffPane } from "@/components/DiffPane";
 import { ActionDialog } from "@/components/ActionDialog";
+import { Loading } from "@/components/Loading";
 import { api } from "@/lib/api";
 import type { ContentDetail, Source, WorkflowAction } from "@/lib/types";
 
@@ -33,7 +34,7 @@ function Detail() {
     try { setD(await api.content(id)); setTick((t) => t + 1); } catch (e) { setError((e as Error).message); }
   }, [id]);
   useEffect(() => { load(); api.sources().then(setSources).catch(() => {}); }, [load]);
-  if (!d) return <div className="p-8">{error ? <ErrorNote message={error} /> : "Loading..."}</div>;
+  if (!d) return error ? <div className="p-8"><ErrorNote message={error} /></div> : <Loading label="Loading review" />;
 
   const cur = d.versions.find((v) => v.version_number === d.content.current_version)!;
   const prev = d.versions.find((v) => v.version_number === d.content.current_version - 1);

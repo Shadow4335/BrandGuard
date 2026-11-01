@@ -6,6 +6,7 @@ import { RequireAuth, ErrorNote } from "@/components/RequireAuth";
 import { StatusBadge } from "@/components/Pills";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
+import { plural } from "@/lib/utils";
 import type { QueueItem } from "@/lib/types";
 
 export default function ReviewsPage() {
@@ -36,7 +37,7 @@ function Queue() {
           <li key={i.content.id} className="p-3 flex flex-wrap items-center justify-between gap-3">
             <div>
               <Link href={role === "creator" ? `/content/${i.content.id}` : `/reviews/${i.content.id}`} className="font-medium underline">{i.content.title}</Link>
-              <p className="text-xs text-zinc-700">by {i.creator_name ?? "unknown"} · {i.content.channel.replace("_", " ")} · {i.total_findings} findings{i.open_high ? ` · ${i.open_high} high-severity unresolved` : ""}</p>
+              <p className="text-xs text-zinc-700">by {i.creator_name ?? "unknown"} · {i.content.channel.replace("_", " ")} · {plural(i.total_findings, "finding")}{i.open_high ? ` · ${i.open_high} high-severity unresolved` : ""}</p>
             </div>
             <StatusBadge status={i.content.status} />
           </li>
