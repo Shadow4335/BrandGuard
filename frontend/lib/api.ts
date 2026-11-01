@@ -167,6 +167,8 @@ export const api = {
     call<ContentDetail>("POST", `/api/content/${id}/transition`, { action, reason, override }),
   queue: () => call<QueueItem[]>("GET", "/api/reviews/queue"),
   audit: (contentId: string) => call<AuditRow[]>("GET", `/api/audit?content_id=${contentId}`),
-  insights: () => call<InsightsSummary>("GET", "/api/insights/summary"),
+  /** scope "mine": only the signed-in user's own work (dashboard); "workspace": everyone's (Insights page). */
+  insights: (scope: "workspace" | "mine" = "workspace") =>
+    call<InsightsSummary>("GET", `/api/insights/summary${scope === "mine" ? "?scope=mine" : ""}`),
   unclear: () => call<UnclearRule[]>("GET", "/api/insights/unclear-rules"),
 };

@@ -33,6 +33,7 @@
         "ALLOWED_ORIGINS=http://localhost:3001",
         "FORCE_MEMORY_STORE=true",
         "MOCK_LLM=true",
+        "DEMO_MODE=true",
         "backend/.venv/bin/python",
         "-m",
         "uvicorn",

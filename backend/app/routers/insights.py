@@ -1,9 +1,9 @@
 """Governance insights: recurring violations, trend, most-overridden rules, unclear guidelines."""
 from collections import Counter
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List
+from typing import Dict, List, Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from app.auth import UserContext, get_current_user
 from app.engine.rules_loader import rule_title
@@ -41,19 +41,29 @@ def _rule_stats(findings: List[dict]) -> List[RuleStat]:
 
 
 @router.get("/summary", response_model=InsightsSummary)
-def summary(user: UserContext = Depends(get_current_user)):
+def summary(user: UserContext = Depends(get_current_user),
+            scope: Literal["workspace", "mine"] = Query("workspace")):
+    """Last 30 days. scope=workspace: everyone's activity in the workspace (the Insights page). scope=mine: only the
+    caller's own work (the dashboard), so a new account starts at zero instead of seeing the shared history:
+    content they created, the findings on it, and approvals they decided."""
     store, org = get_store(), str(user.org_id)
+    me = str(user.user_id)
     findings = _current_findings(org)
+    items = store.select("content_items", {"org_id": org})
+    approvals = store.select("approvals", {"org_id": org})
+    if scope == "mine":
+        items = [i for i in items if i.get("creator_id") == me]
+        version_ids = {v["id"] for v in store.select_where_in("content_versions", "content_item_id", [i["id"] for i in items])}
+        findings = [f for f in findings if f.get("content_version_id") in version_ids]
+        approvals = [a for a in approvals if a.get("actor_id") == me]
     since = datetime.now(timezone.utc) - timedelta(days=30)
     recent = [f for f in findings if datetime.fromisoformat(f["created_at"].replace("Z", "+00:00")) >= since]
     stats = _rule_stats(recent)
     days = Counter(f["created_at"][:10] for f in recent)
     trend = [{"date": (since + timedelta(days=i + 1)).date().isoformat(),
               "count": days.get((since + timedelta(days=i + 1)).date().isoformat(), 0)} for i in range(30)]
-    items = store.select("content_items", {"org_id": org})
     items = [i for i in items if datetime.fromisoformat(i["created_at"].replace("Z", "+00:00")) >= since]
-    approvals = [a for a in store.select("approvals", {"org_id": org})
-                 if datetime.fromisoformat(a["created_at"].replace("Z", "+00:00")) >= since]
+    approvals = [a for a in approvals if datetime.fromisoformat(a["created_at"].replace("Z", "+00:00")) >= since]
     cats = Counter(f["category"] for f in recent)
     return InsightsSummary(
         total_findings=len(recent), total_content=len(items),

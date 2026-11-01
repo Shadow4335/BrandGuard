@@ -106,3 +106,30 @@ def test_creators_cannot_see_each_others_content():
     # Reviewers still see everything in the workspace
     m = c.post("/api/auth/demo-login", json={"role": "manager"}).json()["token"]
     assert c.get(f"/api/content/{cid}", headers={"Authorization": "Bearer " + m}).status_code == 200
+
+
+def test_dashboard_activity_is_only_my_own_work():
+    """A new account's dashboard starts at zero, even though the shared workspace has 30 days of history."""
+    me = {"Authorization": "Bearer " + signup(new_email()).json()["session"]["token"]}
+    mine = c.get("/api/insights/summary?scope=mine", headers=me).json()
+    assert (mine["total_content"], mine["total_findings"], mine["approvals_total"]) == (0, 0, 0)
+    assert sum(d["count"] for d in mine["trend"]) == 0
+    workspace = c.get("/api/insights/summary", headers=me).json()
+    assert workspace["total_content"] > 0 and workspace["total_findings"] > 0  # Insights page keeps the shared view
+
+    cid = c.post("/api/content", headers=me, data={"title": "mine", "channel": SAMPLES[0]["channel"],
+                                                   "text": SAMPLES[0]["text"]}).json()["id"]
+    c.post(f"/api/content/{cid}/review", headers=me)
+    mine = c.get("/api/insights/summary?scope=mine", headers=me).json()
+    assert mine["total_content"] == 1 and mine["total_findings"] >= 5
+    assert sum(d["count"] for d in mine["trend"]) == mine["total_findings"]
+
+
+def test_my_approvals_count_only_decisions_i_made():
+    m = c.post("/api/auth/demo-login", json={"role": "manager"}).json()["token"]
+    h = {"Authorization": "Bearer " + m}
+    mine = c.get("/api/insights/summary?scope=mine", headers=h).json()
+    workspace = c.get("/api/insights/summary", headers=h).json()
+    assert mine["approvals_total"] <= workspace["approvals_total"]
+    assert mine["total_content"] == 0  # managers review content; they don't create it
+    assert c.get("/api/insights/summary?scope=everyone", headers=h).status_code == 422
