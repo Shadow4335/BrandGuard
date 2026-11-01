@@ -63,7 +63,7 @@ export async function signInWithGooglePopup(): Promise<string | null> {
   try {
     const result = await sdk.signInWithPopup(auth, provider);
     const idToken = await result.user.getIdToken();
-    await sdk.signOut(auth); // BrandGuard keeps its own session; don't leave a second one behind
+    sdk.signOut(auth).catch(() => {}); // BrandGuard keeps its own session; drop Firebase's without waiting for it
     return idToken;
   } catch (e: unknown) {
     const code = (e as { code?: string }).code ?? "";

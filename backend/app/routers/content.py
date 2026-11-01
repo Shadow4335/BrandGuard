@@ -1,4 +1,5 @@
 """Content submission, detail, comments, images and sample loader."""
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
@@ -48,7 +49,9 @@ def queue_cards(items: List[dict], org: str) -> List[QueueItem]:
     """Cards for the content list and review queue, with finding counts from each item's latest review. Each table is
     read once for all items: Supabase round trips are slow, and three queries per item made the dashboard take seconds."""
     store = get_store()
-    people = names(org)
+    pool = ThreadPoolExecutor(max_workers=1)
+    people_job = pool.submit(names, org)  # independent of the reads below, so it runs alongside them
+    pool.shutdown(wait=False)
     wanted = {(c["id"], c["current_version"]) for c in items}
     version_id = {v["content_item_id"]: v["id"]
                   for v in store.select_where_in("content_versions", "content_item_id", [c["id"] for c in items])
@@ -60,6 +63,7 @@ def queue_cards(items: List[dict], org: str) -> List[QueueItem]:
     findings: dict = {}
     for f in store.select_where_in("findings", "run_id", list(newest_run.values())):
         findings.setdefault(f["run_id"], []).append(f)
+    people = people_job.result()
     cards = []
     for c in items:
         fs = findings.get(newest_run.get(version_id.get(c["id"])), [])

@@ -17,6 +17,7 @@ export function GoogleSignIn({ role, label = "Continue with Google" }: { role?: 
 
   useEffect(() => {
     if (!firebaseConfigured) return;
+    router.prefetch("/dashboard"); // so the page is ready the moment sign-in finishes
     api.health()
       .then((h) => {
         if (!h.firebase_enabled) return;
@@ -26,7 +27,7 @@ export function GoogleSignIn({ role, label = "Continue with Google" }: { role?: 
         loadFirebase().catch(() => {}).finally(() => setPrepared(true));
       })
       .catch(() => {});
-  }, []);
+  }, [router]);
 
   if (!available) return null;
 

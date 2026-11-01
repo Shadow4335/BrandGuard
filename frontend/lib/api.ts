@@ -30,9 +30,15 @@ export class ApiError extends Error {
   constructor(message: string, status: number) { super(message); this.status = status; }
 }
 
+// A token the API has just issued and verified, used while supabase-js is still saving the session (setSession checks
+// the token with Supabase first, which takes about a second, and getSession waits for it).
+let freshToken: string | null = null;
+export function setFreshToken(t: string | null) { freshToken = t; }
+
 async function token(): Promise<string | null> {
   const demo = getDemoSession();
   if (demo) return demo.token;
+  if (freshToken) return freshToken;
   const { data } = await createClient().auth.getSession();
   return data.session?.access_token ?? null;
 }

@@ -4,7 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase";
 import { Profile, UserRole } from "@/lib/types";
-import { api, getDemoSession, setDemoSession, DemoSession } from "@/lib/api";
+import { api, getDemoSession, setDemoSession, setFreshToken, DemoSession } from "@/lib/api";
 import { signInWithGooglePopup } from "@/lib/firebase";
 
 const DEMO_ROLES: Record<string, UserRole> = {
@@ -221,17 +221,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return true;
       }
       setDemoSession(null);
-      const { data, error: sessionError } = await supabase.auth.setSession({
-        access_token: res.access_token ?? "", refresh_token: res.refresh_token ?? "",
-      });
+      const tokens = { access_token: res.access_token ?? "", refresh_token: res.refresh_token ?? "" };
+      if (res.profile) {
+        // The API has just verified this session and sent the profile, so show the app now and let supabase-js save
+        // the session in the background (its setSession re-checks the token with Supabase: about a second).
+        const p = res.profile;
+        setFreshToken(tokens.access_token);
+        setUser({ id: p.id, email: p.email ?? undefined } as User);
+        setProfile(p);
+        setLoading(false);
+        supabase.auth.setSession(tokens)
+          .then(({ data, error: sessionError }) => {
+            if (sessionError || !data.user) throw sessionError ?? new Error("no user");
+            setUser(data.user);
+          })
+          .catch(() => {
+            setUser(null); setProfile(null);
+            setError("Google sign-in couldn't be completed. Please try again.");
+          })
+          .finally(() => setFreshToken(null));
+        return true;
+      }
+      const { data, error: sessionError } = await supabase.auth.setSession(tokens);
       if (sessionError || !data.user) {
         setError(sessionError?.message ?? "Google sign-in failed. Please try again.");
         setLoading(false);
         return false;
       }
       setUser(data.user);
-      if (res.profile) setProfile(res.profile); // sent with the session: no second lookup
-      else await fetchProfile(data.user.id);
+      await fetchProfile(data.user.id);
       setLoading(false);
       return true;
     } catch (err: unknown) {
