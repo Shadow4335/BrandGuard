@@ -57,6 +57,7 @@ const MESSAGES: Record<string, string> = {
 
 /** Show the Google account picker and return a Firebase ID token, or null if the person closed it. */
 export async function signInWithGooglePopup(): Promise<string | null> {
+  const wasReady = ready !== null;
   const { auth, sdk } = ready ?? (await loadFirebase()); // already loaded in the normal case, so the popup is allowed
   const provider = new sdk.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
@@ -68,6 +69,11 @@ export async function signInWithGooglePopup(): Promise<string | null> {
   } catch (e: unknown) {
     const code = (e as { code?: string }).code ?? "";
     if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") return null;
+    if (code === "auth/popup-blocked" && !wasReady) {
+      // Clicked before Firebase was ready, so it finished preparing first and the browser no longer counted the
+      // click. It is ready now, so the next click opens the popup straight away.
+      throw new Error("Google sign-in needed a moment to get ready. Click Continue with Google again.");
+    }
     throw new Error(MESSAGES[code] ?? "Google sign-in failed. Please try again.");
   }
 }
