@@ -1,5 +1,7 @@
 "use client";
 
+import { isUnresolvedHigh } from "@/lib/findings";
+
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { RequireAuth, ErrorNote } from "@/components/RequireAuth";
@@ -33,12 +35,12 @@ function Detail() {
   const load = useCallback(async () => {
     try { setD(await api.content(id)); setTick((t) => t + 1); } catch (e) { setError((e as Error).message); }
   }, [id]);
-  useEffect(() => { load(); api.sources().then(setSources).catch(() => {}); }, [load]);
+  useEffect(() => { let active = true; Promise.resolve().then(() => { if (active) return load(); }); api.sources().then(setSources).catch(() => {}); return () => { active = false; }; }, [load]);
   if (!d) return error ? <div className="p-8"><ErrorNote message={error} /></div> : <Loading label="Loading review" />;
 
   const cur = d.versions.find((v) => v.version_number === d.content.current_version)!;
   const prev = d.versions.find((v) => v.version_number === d.content.current_version - 1);
-  const unresolved = d.findings.filter((f) => f.severity === "high" && (f.status === "open" || f.status === "rejected")).length;
+  const unresolved = d.findings.filter(isUnresolvedHigh).length;
   const isReviewerApprove = dialog === "approve" && d.allowed_actions.includes("approve") && d.content.status === "escalated";
   const needsReason = dialog === "request_changes" || dialog === "reject" || (isReviewerApprove && unresolved > 0);
 

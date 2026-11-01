@@ -34,7 +34,12 @@ REASON_REQUIRED = {"request_changes", "reject"}
 
 def unresolved_high(findings: List[dict]) -> int:
     """High-severity findings the creator has not fixed (open, or rejected as 'not applicable')."""
-    return sum(1 for f in findings if f["severity"] == "high" and f["status"] in ("open", "rejected"))
+    def changed(f):
+        if not f.get("span"):
+            return False
+        replacement = f.get("decision_text") if f["status"] == "edited" else f.get("replacement") if f["status"] == "accepted" else None
+        return replacement is not None and replacement != f.get("span_text")
+    return sum(1 for f in findings if f["severity"] == "high" and not changed(f))
 
 
 @dataclass

@@ -3,7 +3,7 @@ import threading
 import time
 from typing import Dict, Optional, Tuple
 from uuid import UUID
-from fastapi import Depends, HTTPException, Security, status
+from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
@@ -67,10 +67,24 @@ def _context_from_profile(data: dict, fallback_email: str = "") -> UserContext:
     )
 
 
+def _workspace_context(base: UserContext, selected: Optional[str]) -> UserContext:
+    if not selected or selected == str(base.org_id):
+        return base
+    try:
+        org = str(UUID(selected))
+        rows = get_store().select("workspace_memberships", {"user_id": str(base.user_id), "org_id": org}, limit=1)
+    except Exception:
+        rows = []
+    if not rows:
+        raise HTTPException(403, "You don't have access to that workspace. Choose your default workspace or ask an admin.")
+    return base.model_copy(update={"org_id": UUID(org), "role": UserRole(rows[0]["role"])})
+
+
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Security(security),
 ) -> UserContext:
-    """Resolve role + org from the bearer token. org_id always comes from the profile, never the client."""
+    """Resolve identity from the bearer token and validate any selected workspace against server membership."""
     token = credentials.credentials
     if not token:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Please sign in to continue.",
@@ -84,13 +98,13 @@ async def get_current_user(
         if token.startswith("demo."):
             profile = store.get("profiles", token[5:])
             if profile:
-                return _context_from_profile(profile)
+                return _workspace_context(_context_from_profile(profile), request.headers.get("x-workspace-id"))
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Your session expired. Please sign in again.",
                             headers={"WWW-Authenticate": "Bearer"})
 
     hit = cached_user(token)
     if hit:
-        return hit
+        return _workspace_context(hit, request.headers.get("x-workspace-id"))
     try:
         # Verify the token with Supabase Auth; no local JWT secret is needed.
         auth_response = store.client.auth.get_user(token)  # type: ignore[attr-defined]
@@ -106,7 +120,7 @@ async def get_current_user(
         raise HTTPException(status.HTTP_403_FORBIDDEN, "No BrandGuard profile exists for this account. Ask an admin.")
     context = _context_from_profile(profile, user.email or "")
     cache_user(token, context)
-    return context
+    return _workspace_context(context, request.headers.get("x-workspace-id"))
 
 
 def require_roles(*allowed_roles: UserRole):

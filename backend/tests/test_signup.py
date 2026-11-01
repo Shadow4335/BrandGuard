@@ -59,13 +59,10 @@ def test_self_signup_is_creator_only_by_default():
         assert signup(new_email(), role=role).status_code == 403
 
 
-def test_widened_signup_roles_are_still_enforced(monkeypatch):
-    monkeypatch.setenv("SIGNUP_ALLOWED_ROLES", "creator,manager,reviewer")
-    for role in ["manager", "reviewer"]:
-        r = signup(new_email(), role=role)
-        h = {"Authorization": "Bearer " + r.json()["session"]["token"]}
-        created = c.post("/api/content", headers=h, data={"title": "t", "text": "hello you"})
-        assert created.status_code == 403  # only creators create content
+def test_legacy_signup_roles_cannot_bypass_admin_authorization(monkeypatch):
+    monkeypatch.setenv("SIGNUP_ALLOWED_ROLES", "creator,manager,reviewer,admin")
+    for role in ["manager", "reviewer", "admin"]:
+        assert signup(new_email(), role=role).status_code == 403
 
 
 def test_signup_validation():

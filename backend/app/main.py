@@ -1,9 +1,10 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 
 from app.config import get_settings
-from app.routers import content, core, insights, review, sources, workflow
+from app.routers import content, core, insights, review, sources, workflow, workspaces
 
 settings = get_settings()
 
@@ -18,7 +19,7 @@ app.add_middleware(
     allow_origins=[o.strip() for o in settings.allowed_origins.split(",") if o.strip()],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Workspace-ID"],
 )
 
 
@@ -31,6 +32,12 @@ def announce() -> None:
         # The default was published, so anyone could sign in to the demo accounts directly through Supabase
         raise RuntimeError("Refusing to start in production with default DEMO_USER_PASSWORD. "
                            "Set a long random value and run seed/rotate_demo_passwords.py, or set DEMO_MODE=false.")
+
+
+@app.exception_handler(RequestValidationError)
+async def safe_validation_errors(request: Request, exc: RequestValidationError):
+    # Pydantic errors can include raw input (including passwords or ID tokens).
+    return JSONResponse(status_code=422, content={"detail": "Some fields are invalid. Check the form and try again."})
 
 
 @app.exception_handler(Exception)
@@ -55,3 +62,5 @@ app.include_router(content.router)
 app.include_router(review.router)
 app.include_router(workflow.router)
 app.include_router(insights.router)
+
+app.include_router(workspaces.router)

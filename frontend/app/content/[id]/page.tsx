@@ -1,5 +1,7 @@
 "use client";
 
+import { hasTextChange, isUnresolvedHigh } from "@/lib/findings";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { RequireAuth, ErrorNote } from "@/components/RequireAuth";
@@ -40,7 +42,7 @@ function ContentView() {
     catch (e) { setError((e as Error).message); return null; }
   }, [id]);
 
-  useEffect(() => { load(); api.sources().then(setSources).catch(() => {}); }, [load]);
+  useEffect(() => { let active = true; Promise.resolve().then(() => { if (active) return load(); }); api.sources().then(setSources).catch(() => {}); return () => { active = false; }; }, [load]);
   useEffect(() => {
     if (d?.has_image) api.imageUrl(id, d.content.current_version).then(setImgUrl).catch(() => setImgUrl(null));
   }, [d?.has_image, d?.content.current_version, id]);
@@ -75,8 +77,8 @@ function ContentView() {
   }, [d]);
   const isOwner = profile?.role === "creator";
   const editable = !!d && isOwner && ["draft", "checked", "changes_requested", "rejected", "approved"].includes(d.content.status);
-  const decidedCount = findings.filter((f) => f.status === "accepted" || f.status === "edited").length;
-  const openHigh = findings.filter((f) => f.severity === "high" && (f.status === "open" || f.status === "rejected")).length;
+  const decidedCount = findings.filter(hasTextChange).length;
+  const openHigh = findings.filter(isUnresolvedHigh).length;
 
   async function decide(f: Finding, decision: FindingStatus, text?: string, reason?: string) {
     try { await api.decide(f.id, decision, text, reason); await load(); }

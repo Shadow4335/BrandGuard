@@ -11,12 +11,16 @@ export function ActionDialog({
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => { ref.current?.focus(); }, []);
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    const el = dialog.current;
+    el?.showModal(); ref.current?.focus();
+    return () => { el?.close(); previous?.focus(); };
+  }, []);
   const ok = !required || reason.trim().length >= 5;
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby="dlg-title"
-      onKeyDown={(e) => { if (e.key === "Escape") onCancel(); }}
-      className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+    <dialog ref={dialog} aria-labelledby="dlg-title" onCancel={(e) => { e.preventDefault(); onCancel(); }} className="action-dialog">
       <div className="bg-white rounded-xl p-5 w-full max-w-md space-y-3 shadow-xl">
         <h2 id="dlg-title" className="text-lg font-bold">{title}</h2>
         {description && <p className="text-sm text-zinc-800">{description}</p>}
@@ -29,6 +33,6 @@ export function ActionDialog({
             className={`rounded px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 ${danger ? "bg-red-700" : "bg-indigo-700"}`}>{confirmText}</button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

@@ -21,7 +21,7 @@ export function FindingCard({
   onComment?: () => void;
 }) {
   const [mode, setMode] = useState<null | "edit" | "reject">(null);
-  const [text, setText] = useState(f.replacement ?? f.span_text ?? "");
+  const [text, setText] = useState(f.span_text ?? "");
   const [reason, setReason] = useState("");
   const [openCode, setOpenCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -31,7 +31,7 @@ export function FindingCard({
   const issueText = tidy(isUnsupported
     ? f.issue.replace(/^Unsupported claim:\s*/i, "").replace(/\s*\(Unsupported claim: no approved source\)\s*$/i, "")
     : f.issue);
-  const badge = DECISION_BADGE[f.status];
+  const badge = f.status === "accepted" && f.replacement == null ? ["✓ Acknowledged", DECISION_BADGE.accepted[1]] : DECISION_BADGE[f.status];
 
   async function go(d: "accepted" | "edited" | "rejected") {
     if (!onDecide) return;
@@ -78,15 +78,15 @@ export function FindingCard({
       {canDecide && onDecide && (
         <div className="pt-1 space-y-2" onClick={(e) => e.stopPropagation()}>
           <div className="flex flex-wrap gap-2">
-            <button disabled={busy || (!f.replacement && !f.span)} onClick={() => go("accepted")} className={`${btn} border-emerald-700 text-emerald-900 bg-emerald-50`}>{f.replacement ? "Accept fix" : "Acknowledge"}</button>
-            <button disabled={busy} onClick={() => setMode(mode === "edit" ? null : "edit")} className={`${btn} border-indigo-700 text-indigo-900 bg-indigo-50`}>Edit</button>
+            <button disabled={busy} onClick={() => go("accepted")} className={`${btn} border-emerald-700 text-emerald-900 bg-emerald-50`}>{f.replacement != null ? "Accept fix" : "Acknowledge"}</button>
+            <button disabled={busy || !f.span} onClick={() => { setText(f.decision_text ?? f.span_text ?? ""); setMode(mode === "edit" ? null : "edit"); }} className={`${btn} border-indigo-700 text-indigo-900 bg-indigo-50`}>Edit</button>
             <button disabled={busy} onClick={() => setMode(mode === "reject" ? null : "reject")} className={`${btn} border-zinc-600 text-zinc-900 bg-zinc-50`}>Reject</button>
             {onComment && <button onClick={onComment} className={`${btn} border-zinc-300 text-zinc-800`}>Comment</button>}
           </div>
-          {!f.replacement && f.status === "open" && (
+          {f.replacement == null && f.status !== "rejected" && (
             <p className="text-xs text-zinc-700">{f.span
-              ? "No ready-made wording for this one. Use Edit to write your own, or Acknowledge to note it without changing the text."
-              : "This issue is not tied to specific text. Use Edit to supply wording, or Reject with a reason."}</p>
+              ? "No ready-made wording for this one. Use Edit to write your own, or Acknowledge to note it without changing the text. Acknowledging does not resolve the risk."
+              : "This issue is not tied to specific text. Add alt-text in a new version where applicable, or Reject with a reason."}</p>
           )}
           {mode === "edit" && (
             <div className="space-y-1">

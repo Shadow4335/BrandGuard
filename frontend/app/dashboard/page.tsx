@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { RequireAuth, ErrorNote } from "@/components/RequireAuth";
+import { DashboardInsights } from "@/components/DashboardInsights";
+import { Loading } from "@/components/Loading";
 import { StatusBadge } from "@/components/Pills";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
@@ -45,12 +47,14 @@ function Dashboard() {
   return (
     <div className="max-w-5xl mx-auto p-4 md:p-8 space-y-6">
       <h1 className="text-2xl font-bold">Welcome, {profile.full_name ?? profile.email}</h1>
+      <p className="text-sm text-zinc-700">A clear view of your content. A considered approach to every decision.</p>
       <ErrorNote message={error} />
+      {!items && !error && <Loading label="Loading your content" />}
       <section aria-labelledby="checklist" className="rounded-xl border border-zinc-300 bg-white p-5">
         <h2 id="checklist" className="font-semibold mb-3">Your guided checklist ({profile.role})</h2>
         <ol className="space-y-2">
           {steps.map((s) => {
-            const done = s.done(items ?? []);
+            const done = !!items && s.done(items);
             return (
               <li key={s.text} className="flex items-start gap-2">
                 <span aria-hidden className={done ? "text-emerald-700" : "text-zinc-500"}>{done ? "✔" : "○"}</span>
@@ -63,9 +67,10 @@ function Dashboard() {
       </section>
       <section aria-label="Status counts" className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {(["draft", "checked", "pending_manager", "escalated", "approved", "changes_requested", "rejected"] as const).map((s) => (
-          <div key={s} className="rounded-lg border border-zinc-300 bg-white p-3"><StatusBadge status={s} /><p className="text-2xl font-bold mt-1">{counts[s] ?? 0}</p></div>
+          <div key={s} className="rounded-lg border border-zinc-300 bg-white p-3"><StatusBadge status={s} /><p className="text-2xl font-bold mt-1">{items ? counts[s] ?? 0 : "—"}</p></div>
         ))}
       </section>
+      <DashboardInsights />
       <section aria-labelledby="recent">
         <h2 id="recent" className="font-semibold mb-2">Recent content</h2>
         {items && items.length === 0 && (

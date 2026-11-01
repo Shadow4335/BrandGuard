@@ -7,12 +7,13 @@ import { Loading } from "@/components/Loading";
 
 /** Redirects to /login when signed out; renders children once a profile is loaded. */
 export function RequireAuth({ children, roles }: { children: React.ReactNode; roles?: string[] }) {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, error, refreshProfile, signOut } = useAuth();
   const router = useRouter();
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
   }, [loading, user, router]);
-  if (loading || !user || !profile) return <Loading label="Loading your workspace" />;
+  if (loading || !user) return <Loading label="Loading your workspace" />;
+  if (!profile) return <div className="max-w-xl mx-auto p-8"><ErrorNote message={error || "Could not load your workspace. Please retry."} /><div className="flex gap-3"><button className="rounded-lg border px-4 py-2" onClick={() => refreshProfile()}>Retry</button><button className="rounded-lg border px-4 py-2" onClick={() => signOut()}>Sign out</button></div></div>;
   if (roles && !roles.includes(profile.role)) {
     return (
       <div className="max-w-xl mx-auto p-8">

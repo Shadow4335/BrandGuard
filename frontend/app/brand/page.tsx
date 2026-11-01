@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { RequireAuth, ErrorNote } from "@/components/RequireAuth";
+import { SlidingTabs } from "@/components/SlidingTabs";
+import { Loading } from "@/components/Loading";
 import { SeverityPill } from "@/components/Pills";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
@@ -23,7 +25,7 @@ export default function BrandPage() {
 function Brand() {
   const { profile } = useAuth();
   const [tab, setTab] = useState("guideline");
-  const [sources, setSources] = useState<Source[]>([]);
+  const [sources, setSources] = useState<Source[] | null>(null);
   const [rules, setRules] = useState<RuleInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
@@ -33,7 +35,7 @@ function Brand() {
   const reload = () => api.sources().then(setSources).catch((e) => setError(e.message));
   useEffect(() => { reload(); api.rules().then(setRules).catch((e) => setError(e.message)); }, []);
   const current = TABS.find((t) => t.id === tab)!;
-  const list = sources.filter((s) => current.types.includes(s.source_type));
+  const list = (sources ?? []).filter((s) => current.types.includes(s.source_type));
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
@@ -52,12 +54,8 @@ function Brand() {
       <h1 className="text-2xl font-bold">Brand sources</h1>
       <p className="text-zinc-800">Everything the review checks against. Each item has a code that appears in citations.</p>
       <ErrorNote message={error} />
-      <div role="tablist" className="flex flex-wrap gap-1 border-b border-zinc-300">
-        {TABS.map((t) => (
-          <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}
-            className={`px-3 py-2 text-sm font-medium border-b-2 ${tab === t.id ? "border-indigo-700 text-indigo-900" : "border-transparent text-zinc-700"}`}>{t.label}</button>
-        ))}
-      </div>
+      <SlidingTabs tabs={TABS} value={tab} onChange={(id) => { setTab(id); setOpen(null); }} label="Brand sources">
+      {!sources && !error ? <Loading label="Loading brand sources" /> : <>
       {tab === "rules" ? (
         <ul className="space-y-2">
           {rules.map((r) => (
@@ -94,6 +92,8 @@ function Brand() {
           )}
         </>
       )}
+      </>}
+      </SlidingTabs>
     </div>
   );
 }

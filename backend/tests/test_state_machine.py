@@ -4,7 +4,7 @@ from app.models.enums import UserRole as R
 from app.workflow.state_machine import TRANSITIONS, TransitionError, allowed_actions, apply_transition
 
 HIGH_OPEN = [{"severity": "high", "status": "open"}]
-CLEAN = [{"severity": "high", "status": "accepted"}]
+CLEAN = [{"severity": "high", "status": "accepted", "span": {"start": 0, "end": 5}, "span_text": "claim", "replacement": "qualified claim"}]
 STATUSES = ["draft", "checked", "pending_manager", "changes_requested", "escalated", "approved", "rejected"]
 ACTIONS = ["submit", "approve", "request_changes", "escalate", "reject"]
 
@@ -76,3 +76,8 @@ def test_allowed_actions_per_role():
     assert allowed_actions(c, R.CREATOR, "u1", []) == []
     assert allowed_actions({"status": "checked", "creator_id": "u1"}, R.CREATOR, "u2", []) == []
     assert allowed_actions({"status": "checked", "creator_id": "u1"}, R.CREATOR, "u1", []) == ["submit"]
+
+
+def test_acknowledgement_without_replacement_still_requires_override():
+    with pytest.raises(TransitionError):
+        go("escalated", "approve", R.REVIEWER, [{"severity": "high", "status": "accepted", "span": {"start": 0, "end": 5}}], reason="")

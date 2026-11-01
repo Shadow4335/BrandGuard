@@ -9,52 +9,56 @@ import type { UserRole } from "@/lib/types";
 
 const PREPARE_TIMEOUT_MS = 5000;
 
-/** "Continue with Google". Only shown when the browser has the Firebase config and the API says it's set up too. */
-export function GoogleSignIn({ role, inviteCode, rolePassword, label = "Continue with Google" }: {
-  role?: UserRole; inviteCode?: string; rolePassword?: string; label?: string;
+/** Real Google integration, with preparation and unavailable states checked against the server. */
+export function GoogleSignIn({ role, inviteCode, rolePassword, label = "Continue with Google", disabled = false, onComplete }: {
+  role?: UserRole; inviteCode?: string; rolePassword?: string; label?: string; disabled?: boolean; onComplete?: () => void;
 }) {
   const router = useRouter();
   const { signInWithGoogle } = useAuth();
   const [available, setAvailable] = useState(false);
+  const [checked, setChecked] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [prepared, setPrepared] = useState(false);
 
   useEffect(() => {
-    if (!firebaseConfigured) return;
-    router.prefetch("/dashboard"); // so the page is ready the moment sign-in finishes
-    api.health()
-      .then((h) => {
-        if (!h.firebase_enabled) return;
-        setAvailable(true);
-        // Enable the button once Firebase is fully loaded, so the click opens the popup straight away. If loading
-        // fails or is slow (a slow network can hold the sign-in iframe up for a long time), enable it anyway after a
-        // few seconds: the click then finishes the load first, and the popup may be blocked with a clear message.
-        const giveUp = setTimeout(() => setPrepared(true), PREPARE_TIMEOUT_MS);
-        loadFirebase().catch(() => {}).finally(() => { clearTimeout(giveUp); setPrepared(true); });
-      })
-      .catch(() => {});
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    router.prefetch("/dashboard");
+    api.health().then((h) => {
+      if (!active) return;
+      setChecked(true);
+      if (!firebaseConfigured || !h.firebase_enabled) return;
+      setAvailable(true);
+      timer = setTimeout(() => { if (active) setPrepared(true); }, PREPARE_TIMEOUT_MS);
+      loadFirebase().catch(() => {}).finally(() => { clearTimeout(timer); if (active) setPrepared(true); });
+    }).catch(() => { if (active) { setChecked(true); setFailed(true); } });
+    return () => { active = false; clearTimeout(timer); };
   }, [router]);
 
-  if (!available) return null;
 
   async function onClick() {
     setBusy(true);
-    const ok = await signInWithGoogle(role, inviteCode, rolePassword);
-    setBusy(false);
-    if (ok) router.push("/dashboard");
+    try {
+      const ok = await signInWithGoogle(role, inviteCode, rolePassword);
+      if (ok) router.push("/dashboard");
+    } finally { setBusy(false); onComplete?.(); }
   }
 
   return (
+    <div>
     <button
       type="button"
       onClick={onClick}
-      disabled={busy || !prepared}
-      aria-busy={!prepared || busy}
+      disabled={disabled || busy || !available || !prepared}
+      aria-busy={!checked || (available && !prepared) || busy}
       className="w-full py-2.5 px-4 rounded-lg border border-zinc-300 bg-white hover:bg-zinc-50 text-zinc-900 font-medium text-sm shadow-sm transition flex items-center justify-center gap-2 disabled:opacity-50"
     >
       <GoogleLogo />
-      <span>{busy ? "Signing in with Google..." : prepared ? label : "Preparing Google sign-in..."}</span>
+      <span>{busy ? "Signing in with Google..." : !checked || (available && !prepared) ? "Preparing Google sign-in..." : label}</span>
     </button>
+    {checked && !available && <p className="mt-2 text-xs text-zinc-700" role="status">{failed ? "Google sign-in status could not be checked. Please retry after the server responds." : "Google sign-in is not configured on this server. Use email sign-in or a supported demo role."}</p>}
+    </div>
   );
 }
 

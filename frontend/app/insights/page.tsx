@@ -16,11 +16,12 @@ const card = "rounded-xl border border-zinc-300 bg-white p-4";
 
 function Insights() {
   const [s, setS] = useState<InsightsSummary | null>(null);
-  const [unclear, setUnclear] = useState<UnclearRule[]>([]);
+  const [unclear, setUnclear] = useState<UnclearRule[] | null>(null);
+  const [unclearError, setUnclearError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     api.insights().then(setS).catch((e) => setError(e.message));
-    api.unclear().then(setUnclear).catch(() => {});
+    api.unclear().then(setUnclear).catch((e) => setUnclearError(e.message));
   }, []);
   if (!s) return error ? <div className="p-8"><ErrorNote message={error} /></div> : <Loading label="Loading insights" />;
   const short = (t: string) => (t.length > 30 ? t.slice(0, 29) + "…" : t);
@@ -43,9 +44,11 @@ function Insights() {
 
       <section aria-labelledby="unclear-h" className="rounded-xl border-2 border-amber-500 bg-amber-50 p-4 space-y-2">
         <h2 id="unclear-h" className="font-semibold">Guidelines that may be unclear</h2>
-        {unclear.length === 0 && <p className="text-sm">No rules are being disputed right now.</p>}
+        {unclear?.length === 0 && <p className="text-sm">No rules are being disputed right now.</p>}
+        <ErrorNote message={unclearError} />
+        {!unclear && !unclearError && <p role="status" className="text-sm">Loading guideline signals…</p>}
         <ul className="space-y-2">
-          {unclear.map((u) => (
+          {(unclear ?? []).map((u) => (
             <li key={u.rule_id} className="rounded-lg bg-white border border-amber-300 p-3 text-sm">
               <strong>{u.title}</strong> <code className="text-xs bg-zinc-100 px-1 rounded">{u.rule_id}</code>
               <p>{u.reason}. {u.suggestion}</p>
@@ -61,7 +64,7 @@ function Insights() {
           <div className="h-72" role="img" aria-label="Bar chart of findings per rule">
             <ResponsiveContainer><BarChart data={s.top_rules.map((r) => ({ ...r, name: short(r.title) }))} layout="vertical" margin={{ left: 20 }}>
               <CartesianGrid strokeDasharray="3 3" /><XAxis type="number" allowDecimals={false} /><YAxis type="category" dataKey="name" width={170} tick={{ fontSize: 11 }} />
-              <Tooltip /><Bar dataKey="count" fill="#4338ca" name="Findings" />
+              <Tooltip /><Bar dataKey="count" fill="#bac5ae" name="Findings" isAnimationActive={false} />
             </BarChart></ResponsiveContainer>
           </div>
         </section>
@@ -70,7 +73,7 @@ function Insights() {
           <div className="h-72" role="img" aria-label="Bar chart of findings per category">
             <ResponsiveContainer><BarChart data={s.by_category}>
               <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="category" tick={{ fontSize: 12 }} /><YAxis allowDecimals={false} />
-              <Tooltip /><Bar dataKey="count" fill="#0f766e" name="Findings" />
+              <Tooltip /><Bar dataKey="count" fill="#a5b5be" name="Findings" isAnimationActive={false} />
             </BarChart></ResponsiveContainer>
           </div>
         </section>
@@ -81,11 +84,12 @@ function Insights() {
         <div className="h-64" role="img" aria-label="Line chart of findings per day">
           <ResponsiveContainer><LineChart data={s.trend}>
             <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" tickFormatter={(d: string) => d.slice(5)} tick={{ fontSize: 11 }} /><YAxis allowDecimals={false} />
-            <Tooltip /><Line type="monotone" dataKey="count" stroke="#b45309" strokeWidth={2} dot={false} name="Findings" />
+            <Tooltip /><Line type="monotone" dataKey="count" stroke="#d5b783" strokeWidth={2} dot={false} name="Findings" isAnimationActive={false} />
           </LineChart></ResponsiveContainer>
         </div>
       </section>
 
+      <details className={card}><summary className="cursor-pointer font-medium">View chart data</summary><div className="overflow-x-auto mt-4"><table className="w-full text-sm"><caption className="text-left mb-3">Daily findings · Last 30 days</caption><thead><tr><th className="text-left">Date</th><th className="text-left">Findings</th></tr></thead><tbody>{s.trend.map((d) => <tr key={d.date}><td>{d.date}</td><td>{d.count}</td></tr>)}</tbody></table></div><p className="mt-4 text-sm">By category: {s.by_category.map((c) => `${c.category}: ${c.count}`).join("; ") || "No findings"}.</p><p className="mt-2 text-sm">By rule: {s.top_rules.map((r) => `${r.title}: ${r.count}`).join("; ") || "No findings"}.</p></details>
       <section className={card} aria-labelledby="ov-h">
         <h2 id="ov-h" className="font-semibold mb-2">Most overridden rules</h2>
         <div className="overflow-x-auto">

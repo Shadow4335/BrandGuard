@@ -79,9 +79,9 @@ def test_only_creator_is_self_service_by_default():
     assert signup(role="not-a-role").status_code == 400
 
 
-def test_signup_roles_come_from_the_environment(monkeypatch):
+def test_legacy_public_roles_cannot_bypass_authorization(monkeypatch):
     monkeypatch.setenv("SIGNUP_ALLOWED_ROLES", "creator,manager,reviewer,admin")
-    assert signup(role="admin").status_code == 200
+    assert signup(role="admin").status_code == 403
 
 
 def test_health_reports_demo_mode_and_signup_roles():
@@ -257,4 +257,4 @@ def test_privileged_signup_is_off_without_a_strong_admin_password(monkeypatch):
     monkeypatch.setenv("PRIVILEGED_SIGNUP_PASSWORD", "short")  # under 12 characters: ignored
     assert c.get("/api/health").json()["password_roles"] == []
     r = signup_as("manager", "short")
-    assert r.status_code == 403 and "start as Creator" in r.json()["detail"]
+    assert r.status_code == 403 and "not configured" in r.json()["detail"]
