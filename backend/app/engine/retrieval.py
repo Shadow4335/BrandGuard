@@ -2,10 +2,10 @@
 otherwise keyword overlap (full-text style) so retrieval never blocks the demo."""
 import re
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from app.engine.embeddings import embed_texts
-from app.store import get_store
+from app.store import get_store, io_pool
 
 STOP = set("the a an and or of to in on for with is are was be it its our your you we at by from as this that "
            "contains made have has not no can will".split())
@@ -36,15 +36,28 @@ def split_sentences(text: str) -> List[str]:
     return [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", text) if s.strip()]
 
 
-def retrieve(org_id: str, text: str, k: int = 6) -> List[RetrievedSource]:
+def unique_sentences(text: str) -> List[str]:
+    """Sentences in order, without repeats (ignoring case and spacing): each one costs an embedding and a lookup."""
+    seen, out = set(), []
+    for s in split_sentences(text):
+        key = re.sub(r"\s+", " ", s).lower()
+        if key not in seen:
+            seen.add(key)
+            out.append(s)
+    return out
+
+
+def retrieve(org_id: str, text: str, k: int = 6, all_sources: Optional[List[dict]] = None) -> List[RetrievedSource]:
+    """`all_sources`: the org's source rows if the caller already loaded them (saves a database read)."""
     store = get_store()
-    sources = {s["id"]: s for s in store.select("sources", {"org_id": org_id}) if s["source_type"] in KINDS and s.get("code")}
+    rows = all_sources if all_sources is not None else store.select("sources", {"org_id": org_id})
+    sources = {s["id"]: s for s in rows if s["source_type"] in KINDS and s.get("code")}
     chosen: Dict[str, float] = {}
     # Guidelines are short and always relevant to tone: always include them.
     for s in sources.values():
         if s["source_type"] == "guideline":
             chosen[s["id"]] = 1.0
-    sentences = split_sentences(text) or [text]
+    sentences = unique_sentences(text) or [text]
     def keyword() -> None:
         for sent in sentences:
             st = tokens(sent)
@@ -61,8 +74,10 @@ def retrieve(org_id: str, text: str, k: int = 6) -> List[RetrievedSource]:
     vecs = embed_texts(sentences)
     if vecs:
         try:
-            for v in vecs:
-                for row in store.match_chunks(org_id, ["claim_library"], v, k):
+            # One lookup per sentence, run in parallel: they're independent database round trips
+            jobs = [io_pool.submit(store.match_chunks, org_id, ["claim_library"], v, k) for v in vecs]
+            for job in jobs:
+                for row in job.result():
                     if row["source_id"] in sources:
                         chosen[row["source_id"]] = max(chosen.get(row["source_id"], 0), row.get("similarity", 0.5))
         except Exception:

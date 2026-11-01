@@ -110,7 +110,9 @@ def _now() -> str:
 
 
 def apply_decisions(text: str, findings: list) -> str:
-    """Build the new text from accepted/edited findings only. Overlaps are skipped; nothing else changes."""
+    """Build the new text from accepted/edited findings only; nothing else changes. When two edits overlap, the wider
+    one wins (it rewrites the whole clause the narrower one sits in) and the other is skipped. Insertions (an empty
+    span, e.g. #Ad at the start) never consume text."""
     edits = []
     for f in findings:
         if not f.get("span"):
@@ -119,7 +121,7 @@ def apply_decisions(text: str, findings: list) -> str:
         if new is None:
             continue
         edits.append((f["span"]["start"], f["span"]["end"], new))
-    edits.sort(key=lambda e: (e[0], e[1]))
+    edits.sort(key=lambda e: (e[0], e[1] > e[0], -(e[1] - e[0])))  # by start; insertions first, then widest
     out, pos = [], 0
     for s, e, new in edits:
         if s < pos:

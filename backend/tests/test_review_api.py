@@ -128,3 +128,39 @@ def test_list_and_queue_read_each_table_once(monkeypatch):
         reads.clear()
         assert c.get(path, headers={"Authorization": "Bearer " + token}).status_code == 200
         assert all(reads.count(t) <= 1 for t in ("content_versions", "review_runs", "findings")), reads
+
+
+def test_apply_decisions_insertions_and_overlaps():
+    from app.routers.review import apply_decisions
+    text = "Our balm cures lips fast."
+
+    def f(s, e, new, status="accepted"):
+        return {"span": {"start": s, "end": e}, "status": status, "replacement": new, "decision_text": new}
+    # an insertion at the start never consumes text, even with an edit starting at the same place
+    assert apply_decisions(text, [f(0, 3, "My"), f(0, 0, "#Ad ")]) == "#Ad My balm cures lips fast."
+    # overlapping edits: the wider one wins
+    assert apply_decisions(text, [f(9, 14, "soothes"), f(4, 19, "balm soothes lips")]) == "Our balm soothes lips fast."
+    # rejected or open findings change nothing
+    assert apply_decisions(text, [f(9, 14, "x", "rejected"), f(9, 14, "y", "open")]) == text
+
+
+def test_review_writes_the_audit_log_in_one_batch(monkeypatch):
+    from app.store import get_store
+    store = get_store()
+    single, batches = [], []
+    orig_insert, orig_many = store.insert, store.insert_many
+    monkeypatch.setattr(store, "insert", lambda t, r: single.append(t) or orig_insert(t, r))
+    monkeypatch.setattr(store, "insert_many", lambda t, rows: batches.append((t, len(rows))) or orig_many(t, rows))
+    h = {"Authorization": "Bearer " + c.post("/api/auth/demo-login", json={"role": "creator"}).json()["token"]}
+    cid = c.post("/api/content", headers=h, data={"title": "t", "text": SAMPLES[0]["text"]}).json()["id"]
+    single.clear(); batches.clear()
+    assert c.post(f"/api/content/{cid}/review", headers=h).status_code == 200
+    audit = [n for t, n in batches if t == "audit_log"]
+    # one batch for the run and every finding (the in-memory store writes a batch row by row, so those rows are the
+    # only single audit inserts)
+    assert len(audit) == 1 and audit[0] >= 2 and single.count("audit_log") == audit[0]
+
+
+def test_unique_sentences_drops_repeats():
+    from app.engine.retrieval import unique_sentences
+    assert unique_sentences("Soft lips. soft  LIPS. New formula!") == ["Soft lips.", "New formula!"]

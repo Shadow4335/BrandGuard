@@ -54,16 +54,48 @@ def build_prompt(ctx: ReviewContext, sources: List[RetrievedSource]) -> str:
 
 # ---------- grounding ----------
 
+QUOTE_CLASSES = {'"': '["\u201c\u201d]', "\u201c": '["\u201c\u201d]', "\u201d": '["\u201c\u201d]',
+                 "'": "['\u2018\u2019]", "\u2018": "['\u2018\u2019]", "\u2019": "['\u2018\u2019]"}
+
+
+def _span_pattern(needle: str) -> str:
+    """Regex for the quoted text with any run of whitespace and either quote style allowed."""
+    words = [("".join(QUOTE_CLASSES.get(ch, re.escape(ch)) for ch in w)) for w in needle.split()]
+    return r"\s+".join(words)
+
+
+def _locate_span(text: str, span_text: str, used: List[Tuple[int, int]]) -> Optional[Tuple[int, int]]:
+    """Where the model's quote sits in the content. Tries, in order: exact text, the same text in another case, then
+    the same words with different spacing or quote style. Among matches, the first one no earlier finding has claimed
+    wins, so a repeated phrase gets each occurrence in turn; if all are claimed, the first match is reused (two
+    different issues can concern the same words). Never fuzzy: the span is always text the model actually quoted."""
+    needle = span_text.strip()
+    if not needle:
+        return None
+    candidates: List[Tuple[int, int]] = []
+    for hay, ndl in ((text, needle), (text.lower(), needle.lower())):
+        start = hay.find(ndl)
+        while start >= 0:
+            candidates.append((start, start + len(ndl)))
+            start = hay.find(ndl, start + 1)
+    candidates += [(m.start(), m.end()) for m in re.finditer(_span_pattern(needle), text, re.IGNORECASE)]
+    for s, e in candidates:
+        if not any(s < ue and us < e for us, ue in used):
+            return s, e
+    return candidates[0] if candidates else None
+
+
 def ground(out: AIOutput, ctx: ReviewContext, sources: List[RetrievedSource]) -> List[Finding]:
-    """Validate model output: exact spans only, citations only from the retrieved set."""
+    """Validate model output: quoted spans must be found in the content, citations only from the retrieved set."""
     allowed = {s.code: s for s in sources}
     findings: List[Finding] = []
+    used: List[Tuple[int, int]] = []
     for f in out.findings:
-        idx = ctx.text.find(f.span_text)
-        if idx < 0 or not f.span_text.strip():
-            idx = ctx.text.lower().find(f.span_text.lower())
-        if idx < 0 or not f.span_text.strip():
+        located = _locate_span(ctx.text, f.span_text, used)
+        if not located:
             continue  # cannot locate it in the content: drop
+        start, end = located
+        used.append(located)
         verdict, code = f.verdict, f.source_code
         if code and code not in allowed:
             code, verdict = None, "unsupported"  # fabricated or unretrieved citation: downgrade
@@ -83,8 +115,8 @@ def ground(out: AIOutput, ctx: ReviewContext, sources: List[RetrievedSource]) ->
         category = FindingCategory.TONE if verdict == "off_tone" else FindingCategory(f.category if f.category != "tone" else "claim")
         findings.append(Finding(
             content_version_id=ctx.version_id, org_id=ctx.org_id, layer=FindingLayer.B, category=category,
-            rule_id=rule, source_codes=[code] if code else [], span=TextSpan(start=idx, end=idx + len(f.span_text)),
-            span_text=ctx.text[idx:idx + len(f.span_text)], issue=issue, why_flagged=why,
+            rule_id=rule, source_codes=[code] if code else [], span=TextSpan(start=start, end=end),
+            span_text=ctx.text[start:end], issue=issue, why_flagged=why,
             suggested_fix=f.suggested_fix or "Check this against the approved sources.", replacement=f.replacement,
             severity=sev, confidence=conf))
     return findings

@@ -41,3 +41,31 @@ def test_unsupported_merge_marks_issue_and_keeps_rule_confidence():
 def test_ordering_high_first_then_position():
     out = merge([mk("A", 50, 55, "low"), mk("A", 30, 35, "high"), mk("A", 10, 15, "high")], [])
     assert [(f.severity.value, f.span.start) for f in out] == [("high", 10), ("high", 30), ("low", 50)]
+
+
+def test_rule_match_inside_a_slightly_wider_ai_span_merges():
+    a = mk("A", 0, 12, "high", ["REG-CCPA-2022"], "RULE-ABS-001")    # "100% natural"
+    b = mk("B", 0, 27, "medium", ["FACT-001"], "RULE-CLAIM-FACT")    # "100% natural, chemical-free"
+    out = merge([a], [b])
+    assert len(out) == 1 and set(out[0].source_codes) == {"REG-CCPA-2022", "FACT-001"}
+
+
+def test_rule_match_inside_a_whole_sentence_stays_separate():
+    out = merge([mk("A", 10, 15, "high")], [mk("B", 0, 80, "medium")])
+    assert len(out) == 2
+
+
+def test_different_categories_do_not_merge_by_containment():
+    out = merge([mk("A", 0, 8, "high", cat="terminology")], [mk("B", 0, 20, "medium")])  # IoU 0.4, contained
+    assert len(out) == 2
+
+
+def test_merged_fix_keeps_its_own_span():
+    """Accept replaces exactly the span, so the replacement must come with the span it was written for."""
+    a = mk("A", 5, 10, "high", repl="free from parabens")
+    b = mk("B", 0, 12, "medium")
+    f = merge([a], [b])[0]
+    assert (f.span.start, f.span.end, f.replacement) == (5, 10, "free from parabens")
+    wide = mk("B", 0, 12, "medium", repl="Gentle, natural care")
+    f = merge([mk("A", 5, 10, "high", repl="x")], [wide])[0]
+    assert (f.span.start, f.span.end, f.replacement) == (0, 12, "Gentle, natural care")

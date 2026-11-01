@@ -9,12 +9,18 @@ from __future__ import annotations
 import copy
 import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from app.config import get_settings
 
 Row = Dict[str, Any]
+
+# Long-lived threads for running independent database calls in parallel. Each thread keeps its own Supabase client
+# (see SupabaseStore.client), so reusing threads reuses their connections instead of opening new ones per request.
+# Tasks submitted here must not wait on other tasks in this pool.
+io_pool = ThreadPoolExecutor(max_workers=16, thread_name_prefix="store-io")
 
 
 def _now() -> str:

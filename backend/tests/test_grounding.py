@@ -71,3 +71,29 @@ def test_content_tags_in_submitted_text_cannot_break_out_of_the_block():
     assert "[content-tag]" in prompt and "<CONTENT" not in prompt
     channel_line = prompt.splitlines()[1]
     assert channel_line.startswith("CHANNEL: instagram_post") and "<" not in channel_line
+
+
+def _ai(span, issue="i", verdict="unsupported"):
+    return AIFinding(span_text=span, issue=issue, verdict=verdict)
+
+
+def test_repeated_phrase_gets_each_occurrence_in_turn():
+    text = "Clinically proven care. Our balm is Clinically proven too."
+    out = ground(AIOutput(findings=[_ai("Clinically proven"), _ai("Clinically proven")]), ctx(text), [])
+    assert [f.span.start for f in out] == [0, text.rfind("Clinically proven")]
+
+
+def test_spacing_and_quote_style_differences_still_ground():
+    text = "Our “miracle”  balm\nworks fast."
+    out = ground(AIOutput(findings=[_ai('"miracle" balm works')]), ctx(text), [])
+    assert len(out) == 1 and out[0].span_text == "“miracle”  balm\nworks"
+
+
+def test_two_issues_on_the_same_words_are_both_kept():
+    text = "India's #1 lip care."
+    out = ground(AIOutput(findings=[_ai("India's #1"), _ai("India's #1", issue="other")]), ctx(text), [])
+    assert len(out) == 2 and out[0].span == out[1].span
+
+
+def test_text_not_in_the_content_is_still_dropped():
+    assert ground(AIOutput(findings=[_ai("clinically tested")]), ctx("Clinically proven care."), []) == []
