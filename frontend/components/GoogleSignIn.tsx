@@ -10,7 +10,7 @@ import type { UserRole } from "@/lib/types";
 const PREPARE_TIMEOUT_MS = 5000;
 
 /** "Continue with Google". Only shown when the browser has the Firebase config and the API says it's set up too. */
-export function GoogleSignIn({ role, label = "Continue with Google" }: { role?: UserRole; label?: string }) {
+export function GoogleSignIn({ role, inviteCode, label = "Continue with Google" }: { role?: UserRole; inviteCode?: string; label?: string }) {
   const router = useRouter();
   const { signInWithGoogle } = useAuth();
   const [available, setAvailable] = useState(false);
@@ -37,7 +37,7 @@ export function GoogleSignIn({ role, label = "Continue with Google" }: { role?: 
 
   async function onClick() {
     setBusy(true);
-    const ok = await signInWithGoogle(role);
+    const ok = await signInWithGoogle(role, inviteCode);
     setBusy(false);
     if (ok) router.push("/dashboard");
   }

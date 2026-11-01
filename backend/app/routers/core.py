@@ -7,11 +7,13 @@ import time
 import uuid
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Security
+from fastapi.security import HTTPAuthorizationCredentials
 
 from app.audit import log_event
-from app.auth import UserContext, _context_from_profile, cache_user, get_current_user
+from app.auth import UserContext, _context_from_profile, cache_user, evict_token, get_current_user, security
 from app.config import get_settings
 from app.firebase_auth import verify_firebase_token
 from app.models.api import (DemoLoginIn, DemoLoginOut, DemoSessionOut, GoogleLoginIn, GoogleLoginOut, HealthOut, LoginIn,
@@ -30,6 +32,7 @@ _signups: dict = defaultdict(deque)
 _logins: dict = defaultdict(deque)
 _demos: dict = defaultdict(deque)
 _google: dict = defaultdict(deque)
+MAX_THROTTLE_IPS = 5000                # per bucket; caps memory if many addresses hit the API
 
 
 @router.get("/health", response_model=HealthOut)
@@ -40,7 +43,7 @@ def health():
                      ai_live=s.llm_available, ai_backup=s.llm_backup_provider if s.llm_backup_ready else "", store="supabase" if s.use_supabase else "memory",
                      version=s.app_version, commit=os.getenv("RENDER_GIT_COMMIT", "local")[:7],
                      demo_mode=s.demo_mode, signup_roles=s.signup_roles,
-                     firebase_enabled=bool(s.firebase_project_id))
+                     firebase_enabled=bool(s.firebase_project_id), signup=_signup_mode())
 
 
 @router.get("/me")
@@ -83,14 +86,50 @@ def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "?"
 
 
-def _throttle(bucket: dict, request: Request, limit: int, message: str, window: int = SIGNUP_WINDOW) -> None:
-    """Allow `limit` requests per client address per `window` seconds (in memory, per server instance)."""
-    q, now = bucket[_client_ip(request)], time.time()
-    while q and now - q[0] > window:
-        q.popleft()
+def throttle(bucket: dict, request: Request, limit: int, message: str, window: int = SIGNUP_WINDOW,
+             key: str = "") -> None:
+    """Allow `limit` requests per `key` (default: client address) per `window` seconds. In memory, per server
+    instance; used by other routers too. Empty entries are dropped and each bucket holds at most MAX_THROTTLE_IPS keys,
+    so a flood of distinct addresses can't grow memory without limit."""
+    key, now = key or _client_ip(request), time.time()
+    q = bucket.get(key)
+    if q is not None:
+        while q and now - q[0] > window:
+            q.popleft()
+        if not q:
+            bucket.pop(key, None)
+            q = None
+    if q is None:
+        if len(bucket) >= MAX_THROTTLE_IPS:
+            for old in list(bucket)[: len(bucket) // 2]:  # dicts keep insertion order: oldest keys first
+                bucket.pop(old, None)
+        q = bucket[key] = deque()
     if len(q) >= limit:
         raise HTTPException(429, message)
     q.append(now)
+
+
+_throttle = throttle  # the name used in this module
+
+
+def _signup_mode() -> str:
+    """Whether people can create their own accounts here. With SIGNUP_ORG_ID set, or in demo mode, sign-ups join that
+    shared workspace freely. Otherwise the only workspace is the seeded one, so joining needs SIGNUP_INVITE_CODE."""
+    if os.getenv("SIGNUP_ORG_ID") or get_settings().demo_mode:
+        return "open"
+    return "invite" if os.getenv("SIGNUP_INVITE_CODE") else "closed"
+
+
+def _signup_workspace(invite_code: Optional[str]) -> str:
+    """The workspace a self-created account joins, enforcing the invite code when one is required."""
+    mode = _signup_mode()
+    if mode == "closed":
+        raise HTTPException(403, "Sign-up is closed on this server. Ask an admin to create your account.")
+    if mode == "invite":
+        expected = os.getenv("SIGNUP_INVITE_CODE", "")
+        if not secrets.compare_digest((invite_code or "").strip().encode(), expected.encode()):
+            raise HTTPException(403, "That invite code isn't valid. Check it with whoever invited you.")
+    return os.getenv("SIGNUP_ORG_ID") or ORG_ID
 
 
 def _rate_limit(request: Request) -> None:
@@ -113,13 +152,13 @@ def signup(body: SignupIn, request: Request):
     if problem:
         raise HTTPException(400, problem)
     if body.role not in ROLES:
-        raise HTTPException(400, "Choose a role: creator, manager or reviewer.")
+        raise HTTPException(400, "Choose a role.")
     if body.role not in get_settings().signup_roles:
-        raise HTTPException(403, "That role can't be chosen when signing up. Pick another, or use the one-click demo account for it on the sign-in page.")
+        raise HTTPException(403, "New accounts start as Creator. Ask an admin if you need another role.")
     _rate_limit(request)
+    org = _signup_workspace(body.invite_code)
 
     s, store = get_settings(), get_store()
-    org = os.getenv("SIGNUP_ORG_ID", ORG_ID)
     if not s.use_supabase:
         if any((p.get("email") or "").lower() == email for p in store.select("profiles")):
             raise HTTPException(409, "An account with this email already exists. Sign in instead.")
@@ -222,7 +261,6 @@ def google_login(body: GoogleLoginIn, request: Request):
     name = (claims.get("name") or email.split("@")[0]).strip()[:80]
     default_role = "creator" if "creator" in s.signup_roles else (s.signup_roles or ["creator"])[0]
     role = body.role or default_role
-    org = os.getenv("SIGNUP_ORG_ID", ORG_ID)
 
     def find_profile():
         rows = store.select("profiles", {"email": email}, limit=1)
@@ -233,7 +271,8 @@ def google_login(body: GoogleLoginIn, request: Request):
         created = profile is None
         if created:
             if role not in s.signup_roles:
-                raise HTTPException(403, "That role can't be chosen when signing up. Pick another.")
+                raise HTTPException(403, "New accounts start as Creator. Ask an admin if you need another role.")
+            org = _signup_workspace(body.invite_code)
             profile = store.insert("profiles", {"id": str(uuid.uuid4()), "org_id": org, "role": role,
                                                 "email": email, "full_name": name})
             log_event(org, profile["id"], "user_signed_up", "profile", profile["id"], {"role": role, "via": "google"})
@@ -257,7 +296,8 @@ def google_login(body: GoogleLoginIn, request: Request):
     created = profile is None
     if created:
         if role not in s.signup_roles:
-            raise HTTPException(403, "That role can't be chosen when signing up. Pick another.")
+            raise HTTPException(403, "New accounts start as Creator. Ask an admin if you need another role.")
+        org = _signup_workspace(body.invite_code)
         meta = {"full_name": name, "role": role, "firebase_uid": claims.get("sub")}
         try:
             if early_link and early_link.user:
@@ -301,3 +341,11 @@ def google_login(body: GoogleLoginIn, request: Request):
                           refresh_token=session.refresh_token,
                           profile={"id": str(user.user_id), "org_id": str(user.org_id), "role": user.role.value,
                                    "email": email, "full_name": user.full_name})
+
+
+@router.post("/auth/logout")
+def logout(credentials: HTTPAuthorizationCredentials = Security(security)):
+    """Drop the caller's token from the API's verified-token cache, so it stops working here straight away rather
+    than up to a minute later. (Supabase ends the session itself when the browser signs out.)"""
+    evict_token(credentials.credentials)
+    return {"ok": True}

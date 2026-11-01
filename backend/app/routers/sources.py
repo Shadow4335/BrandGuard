@@ -1,7 +1,9 @@
 """Brand sources (guidelines, facts, terminology, regulatory, assets) and the read-only rule library."""
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from collections import defaultdict, deque
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
 from app.audit import log_event
 from app.auth import UserContext, get_current_user, require_roles
@@ -11,11 +13,15 @@ from app.models.api import RuleOut, SourceOut
 from app.models.enums import UserRole
 from app.parsing import UploadError, parse_upload
 from app.routers.content import mime_for, storage_name
+from app.routers.core import throttle
 from app.seed_data import chunk_text
 from app.store import get_store
 
 router = APIRouter(prefix="/api", tags=["Brand"])
 KINDS = {"guideline", "terminology", "claim_library", "regulatory", "asset", "other"}
+MAX_SOURCE_CHARS, MAX_SOURCE_CHUNKS = 100_000, 200  # each chunk is embedded, so size drives cost and time
+SOURCE_LIMIT, SOURCE_WINDOW = 10, 600              # source uploads per user per 10 minutes
+_source_uploads: dict = defaultdict(deque)
 
 
 @router.get("/sources", response_model=List[SourceOut])
@@ -31,12 +37,16 @@ def list_sources(user: UserContext = Depends(get_current_user)):
 
 @router.post("/sources", response_model=SourceOut)
 def create_source(  # sync on purpose: OCR/parsing/embedding run in the worker pool
-    kind: str = Form(...), title: str = Form(...), code: Optional[str] = Form(None),
+    request: Request, kind: str = Form(...), title: str = Form(...), code: Optional[str] = Form(None),
     text: Optional[str] = Form(None), file: Optional[UploadFile] = File(None),
     user: UserContext = Depends(require_roles(UserRole.ADMIN)),
 ):
     if kind not in KINDS:
         raise HTTPException(400, f"Kind must be one of: {', '.join(sorted(KINDS))}.")
+    if text and len(text) > MAX_SOURCE_CHARS:
+        raise HTTPException(413, f"That text is too long. Keep a source under {MAX_SOURCE_CHARS:,} characters.")
+    throttle(_source_uploads, request, SOURCE_LIMIT, "Too many sources added in a short time. Please wait a few "
+             "minutes and try again.", SOURCE_WINDOW, key=str(user.user_id))
     body, path = text or "", None
     store, org = get_store(), str(user.org_id)
     if file is not None:
@@ -46,6 +56,8 @@ def create_source(  # sync on purpose: OCR/parsing/embedding run in the worker p
         except UploadError as e:
             raise HTTPException(e.status_code, e.message)
         body = doc.text or body
+        if len(body) > MAX_SOURCE_CHARS:
+            raise HTTPException(413, f"That file has too much text. Keep a source under {MAX_SOURCE_CHARS:,} characters.")
         path = f"{org}/{storage_name(file.filename)}"
         try:
             store.put_file("sources", path, data, mime_for(doc.file_type, file.content_type))
@@ -53,9 +65,11 @@ def create_source(  # sync on purpose: OCR/parsing/embedding run in the worker p
             raise HTTPException(502, "We couldn't save your file right now. Please try again in a moment.")
     if not body.strip():
         raise HTTPException(400, "Add some text or upload a file with readable text.")
+    pieces = chunk_text(body)
+    if len(pieces) > MAX_SOURCE_CHUNKS:
+        raise HTTPException(413, "That source is too long to index. Split it into smaller sources.")
     row = store.insert("sources", {"org_id": org, "title": title, "source_type": kind, "code": code,
                                    "body": body, "file_path": path, "metadata": {}})
-    pieces = chunk_text(body)
     vecs = embed_texts(pieces)
     for i, piece in enumerate(pieces):
         store.insert("source_chunks", {"source_id": row["id"], "org_id": org, "content": piece, "chunk_index": i,

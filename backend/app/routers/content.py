@@ -2,7 +2,9 @@
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
+from collections import defaultdict, deque
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
 
 from app.audit import log_event
 from app.auth import UserContext, get_current_user, require_roles
@@ -12,10 +14,13 @@ from app.models.api import CommentCreateIn, ContentDetail, QueueItem, SampleOut
 from app.models.enums import UserRole
 from app.parsing import UploadError, parse_upload
 from app.seed_data import SAMPLES, make_poster_png
+from app.routers.core import throttle
 from app.store import get_store
 
 router = APIRouter(prefix="/api", tags=["Content"])
 CHANNELS = {"instagram_post", "website_page", "influencer_post", "press_release", "email"}
+UPLOAD_LIMIT, UPLOAD_WINDOW = 20, 600  # new content items per user per 10 minutes (parsing and OCR are expensive)
+_uploads: dict = defaultdict(deque)
 
 
 def storage_name(filename: Optional[str]) -> str:
@@ -37,6 +42,9 @@ def mime_for(file_type: str, fallback: Optional[str]) -> str:
 def get_content_or_404(content_id: str, user: UserContext) -> dict:
     row = get_store().get("content_items", content_id, str(user.org_id))
     if not row:
+        raise HTTPException(404, "We couldn't find that content. It may have been removed.")
+    # Creators only see their own work (same 404, so other people's IDs can't be probed); reviewers and admins see all
+    if user.role == UserRole.CREATOR and str(row.get("creator_id")) != str(user.user_id):
         raise HTTPException(404, "We couldn't find that content. It may have been removed.")
     return row
 
@@ -117,12 +125,14 @@ def sample_image(key: str, user: UserContext = Depends(get_current_user)):
 
 @router.post("/content")
 def create_content(  # sync on purpose: OCR/parsing runs in the worker pool, not on the event loop
-    title: str = Form(...), channel: str = Form("instagram_post"), ai_generated: bool = Form(False),
+    request: Request, title: str = Form(...), channel: str = Form("instagram_post"), ai_generated: bool = Form(False),
     text: Optional[str] = Form(None), alt_text: Optional[str] = Form(None), file: Optional[UploadFile] = File(None),
     user: UserContext = Depends(require_roles(UserRole.CREATOR)),
 ):
     if channel not in CHANNELS:
         raise HTTPException(400, f"Channel must be one of: {', '.join(sorted(CHANNELS))}.")
+    throttle(_uploads, request, UPLOAD_LIMIT, "You've added a lot of content in a short time. Please wait a few "
+             "minutes and try again.", UPLOAD_WINDOW, key=str(user.user_id))
     store, org = get_store(), str(user.org_id)
     body, file_type, path, note = text or "", "text/plain", None, None
     if file is not None:

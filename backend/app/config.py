@@ -57,8 +57,8 @@ class Settings(BaseModel):
     supabase_service_key: str = os.getenv("SUPABASE_SERVICE_KEY", "")
     allowed_origins: str = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
     demo_password: str = os.getenv("DEMO_USER_PASSWORD") or "BrandGuard2026!"  # an empty value also means the default
-    # One-click demo accounts. DEMO_MODE=false leaves a deployment with real accounts only.
-    demo_mode: bool = _flag("DEMO_MODE", "true")
+    # One-click demo accounts. Off unless DEMO_MODE=true: a deployment has real accounts only by default.
+    demo_mode: bool = _flag("DEMO_MODE", "false")
     # Google sign-in through Firebase: only the project ID is needed to check ID tokens. Empty = off.
     firebase_project_id: str = os.getenv("FIREBASE_PROJECT_ID", "").strip()
     tesseract_cmd: str = os.getenv("TESSERACT_CMD", "")
@@ -66,9 +66,9 @@ class Settings(BaseModel):
 
     @property
     def signup_roles(self) -> list:
-        """Roles people may give themselves at sign-up. Admin is excluded by default: admins edit the shared brand
-        sources that every review depends on."""
-        allowed = {r.strip() for r in os.getenv("SIGNUP_ALLOWED_ROLES", "creator,manager,reviewer").split(",")}
+        """Roles people may give themselves at sign-up: creator only by default. Manager, reviewer and admin approve
+        content or edit the shared brand sources, so self-assigning them is opt-in (SIGNUP_ALLOWED_ROLES)."""
+        allowed = {r.strip() for r in os.getenv("SIGNUP_ALLOWED_ROLES", "creator").split(",")}
         return [r for r in ("creator", "manager", "reviewer", "admin") if r in allowed]
 
     @property

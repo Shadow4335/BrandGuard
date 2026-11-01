@@ -20,7 +20,7 @@ The demo brand is **GlowLeaf Naturals**, a fictional Indian personal-care brand.
 
 Sample 2 is an influencer post (missing #Ad and AI label); sample 3 is a poster image (contrast and missing alt-text); sample 4 is clean.
 
-**Your own account:** click *Sign up* (top right or under the login form), pick a role (Creator, Manager or Reviewer), and you're in. Passwords need 10+ characters and are checked on the server. No email confirmation. New accounts join the shared GlowLeaf Naturals demo workspace, so brand sources and sample history are already there. Admin accounts can't be self-created; use the one-click Admin demo. To see the whole workflow, use the demo role switcher (shown only while signed in as a demo user) or sign out and pick another demo role.
+**Your own account:** click *Sign up* (top right or under the login form), and you're in as a Creator. Passwords need 10+ characters and are checked on the server. No email confirmation. New accounts join the shared GlowLeaf Naturals demo workspace, so brand sources and sample history are already there. Admin accounts can't be self-created; use the one-click Admin demo. To see the whole workflow, use the demo role switcher (shown only while signed in as a demo user) or sign out and pick another demo role.
 
 **Supported uploads (up to 10 MB):** PDF (scanned PDFs are read with OCR, first 5 pages), Word `.docx` (pictures without alt-text are flagged), images PNG/JPG/WEBP/GIF/BMP/TIFF (OCR, contrast and alt-text checks; add alt-text later from the content page), TXT/Markdown, and HTML (`<img>` without alt is flagged). Old `.doc`, HEIC, PowerPoint and other files get a clear message asking for a supported format.
 
@@ -47,7 +47,7 @@ Tests (offline, no keys): `cd backend && python -m pytest -q`.
 
 ### With Supabase and a live LLM
 
-1. Create a Supabase project. In the SQL editor run `seed/migrations/001_initial_schema.sql`, then `002_workflow.sql`.
+1. Create a Supabase project. In the SQL editor run `seed/migrations/001_initial_schema.sql`, then `002_workflow.sql`, then `003_security_hardening.sql`.
 2. Copy `backend/.env.example` to `backend/.env`; set `SUPABASE_*`, `LLM_API_KEY`, and `MOCK_LLM=false`. Copy `frontend/.env.example` to `frontend/.env.local`.
 3. Seed users, brand sources and 30 days of history (idempotent): `backend/.venv/bin/python seed/seed_demo.py`.
 
@@ -75,12 +75,13 @@ Firebase only confirms who the person is. The API checks the Firebase ID token, 
 | `LLM_PROVIDER`, `LLM_MODEL`, `LLM_API_KEY`, `MOCK_LLM` | backend only | AI layer; unset key = offline fallback |
 | `LLM_FALLBACK_MODEL` | backend only | second Gemini model used when the main one is overloaded or out of quota (default `gemini-flash-lite-latest`) |
 | `LLM_BACKUP_PROVIDER`, `LLM_BACKUP_API_KEY`, `LLM_BACKUP_MODEL` | backend only | optional second provider (`groq`, `anthropic`, `openai`, `xai` or another `gemini` key) tried when Gemini fails. The demo uses Groq (`openai/gpt-oss-120b`) |
-| `SIGNUP_ORG_ID` | backend only | optional: workspace new sign-ups join (defaults to the GlowLeaf demo org) |
+| `SIGNUP_ORG_ID` | backend only | optional: workspace anyone may join at sign-up. Without it (and with `DEMO_MODE` off) sign-up needs `SIGNUP_INVITE_CODE`, or is closed |
+| `SIGNUP_INVITE_CODE` | backend only | optional: code people must enter to sign up when there's no `SIGNUP_ORG_ID` and demo mode is off |
 | `EMBED_MODEL`, `EMBED_DIM` | backend | embeddings (768) |
 | `ALLOWED_ORIGINS` | backend | CORS (add the Vercel URL) |
 | `DEMO_USER_PASSWORD` | backend/seed | secret password of the four demo accounts; only the server uses it. Set a long random value and run `seed/rotate_demo_passwords.py` |
-| `DEMO_MODE` | backend | `true` (default) enables the one-click demo accounts; `false` leaves only real accounts and hides the demo buttons |
-| `SIGNUP_ALLOWED_ROLES` | backend | roles a person may pick at sign-up (default `creator,manager,reviewer`; admin is left out on purpose) |
+| `DEMO_MODE` | backend | `false` (default) leaves only real accounts; `true` enables the one-click demo accounts and lets anyone sign up to the shared demo workspace. With Supabase, the API refuses to start in demo mode while `DEMO_USER_PASSWORD` is the published default |
+| `SIGNUP_ALLOWED_ROLES` | backend | roles a person may pick at sign-up (default `creator`; an admin assigns manager, reviewer and admin) |
 | `FIREBASE_PROJECT_ID` | backend | turns on Google sign-in; ID tokens must come from this Firebase project |
 | `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `NEXT_PUBLIC_FIREBASE_APP_ID` | frontend | Firebase web app config for the Google popup (public values) |
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_API_URL` | frontend | public config |

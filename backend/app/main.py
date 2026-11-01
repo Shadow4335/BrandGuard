@@ -17,8 +17,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in settings.allowed_origins.split(",") if o.strip()],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
 
@@ -28,8 +28,9 @@ def announce() -> None:
     print(f"BrandGuard API {settings.app_version} commit={os.getenv('RENDER_GIT_COMMIT', 'local')[:7]} "
           f"store={'supabase' if settings.use_supabase else 'memory'} ai_live={settings.llm_available}", flush=True)
     if settings.use_supabase and settings.demo_mode and settings.demo_password == "BrandGuard2026!":
-        print("WARNING: DEMO_MODE is on and DEMO_USER_PASSWORD is still the published default. "
-              "Set a long random value and run seed/rotate_demo_passwords.py.", flush=True)
+        # The default was published, so anyone could sign in to the demo accounts directly through Supabase
+        raise RuntimeError("Refusing to start in production with default DEMO_USER_PASSWORD. "
+                           "Set a long random value and run seed/rotate_demo_passwords.py, or set DEMO_MODE=false.")
 
 
 @app.exception_handler(Exception)

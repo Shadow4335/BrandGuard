@@ -329,4 +329,5 @@ export interface Health {
   demo_mode?: boolean;        // the one-click demo accounts are on
   signup_roles?: UserRole[];  // roles a new account may pick
   firebase_enabled?: boolean; // Google sign-in (Firebase) is set up on the server
+  signup?: "open" | "invite" | "closed"; // whether people can create their own accounts
 }

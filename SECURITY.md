@@ -6,26 +6,40 @@ How accounts, passwords and demo access work, what is protected, and what still 
 
 - **Sign-in uses Supabase Auth.** Supabase stores passwords only as **bcrypt hashes**. BrandGuard never stores a password after sign-up and never logs one.
 - **Sign-up goes through our API, not the browser.** The server checks the password rules, limits which roles can be chosen, rate-limits, and only then creates the user with the service role. The rules (`backend/app/passwords.py`): 10 to 128 characters, not a common password, not the product or brand name, not containing your name or email, not repetitive or digits-only. Length and unpredictability matter more than composition rules (NIST SP 800-63B).
-- **Admin isn't self-service.** Admins can change the shared brand sources that every review relies on, so new accounts can only pick Creator, Manager or Reviewer (`SIGNUP_ALLOWED_ROLES`). The one-click Admin demo shows that view.
+- **Only Creator is self-service.** Managers and reviewers approve content and admins change the shared brand sources, so new accounts start as Creator (`SIGNUP_ALLOWED_ROLES` widens this). The one-click demo accounts show the other views.
+- **Who can sign up.** In demo mode, or with `SIGNUP_ORG_ID` set, anyone may join that workspace. Otherwise sign-up needs `SIGNUP_INVITE_CODE` (compared in constant time) or is closed. This applies to Google sign-in too.
+- **Creators only see their own content.** Every content endpoint returns 404 for another creator's item, so IDs can't be probed; managers, reviewers and admins see the whole workspace.
+- **Sign-out ends the API's cache entry.** `POST /api/auth/logout` drops the token from the 60-second verified-token cache straight away.
 - **Roles come from the server.** Every API call takes the role and workspace from the database profile of the verified token. The browser is trusted for neither, and the UI never falls back to a role in user-editable metadata.
 - **Offline demo mode** (no Supabase configured) stores PBKDF2-HMAC-SHA256 hashes with a random per-account salt and 600,000 iterations, in a format that records its parameters (`pbkdf2_sha256$iterations$salt$digest`), compared in constant time.
 
 ## Demo accounts
 
 - The four demo users sign in through `POST /api/auth/demo-session`: **the server signs them in and returns the session tokens.** The demo password is no longer in the browser bundle, the README or the login page.
-- `DEMO_MODE=false` turns this off: the endpoint returns 404 and the login page hides the demo buttons.
+- Demo accounts are **off by default** (`DEMO_MODE=false`): the demo endpoints return 404 and the login page hides the demo buttons. With Supabase, the API refuses to start in demo mode while `DEMO_USER_PASSWORD` is still the published default.
 - The role switcher only appears while signed in as a demo user, so real accounts keep their own identity in comments and the audit trail.
 - Demo accounts and real sign-ups share one fictional workspace. Don't upload confidential material.
 
 ## Abuse protection
 
 - Per-IP limits: 5 sign-ups, 30 demo sessions and 10 password logins (offline mode) per 10 minutes. The client address is the **right-most** `X-Forwarded-For` entry, which the host's proxy adds, so a forged header can't get around the limit.
+- Per-user limits on expensive work: 15 AI reviews, 20 content uploads and 10 brand-source uploads per 10 minutes. Sources are capped at 100,000 characters and 200 indexed chunks.
+- Each limit keeps at most 5,000 addresses or users in memory and drops empty entries, so a flood of new addresses can't exhaust memory.
+- Uploads: `.docx` files may expand to at most 50 MB (and 100× per entry), PDFs to 100 pages and 250,000 characters, and images to 25 megapixels, including scanned PDF pages rendered for OCR.
 - The limits live in memory on each server instance: they reset on restart and aren't shared between instances.
 - Password sign-in is also rate-limited by Supabase (Auth → Rate limits in the dashboard).
 
 ## Browser protections
 
-`frontend/next.config.ts` sends `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy` and HSTS. There is **no** Content-Security-Policy yet: Next.js inline scripts need nonces, so add one deliberately and test it.
+`frontend/next.config.ts` sends a Content-Security-Policy, `X-Content-Type-Options`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy`, `Permissions-Policy` and HSTS. The CSP limits scripts to this site and Google sign-in, and network requests to this site, the API, Supabase and Google's auth endpoints. It still allows inline scripts, which Next.js's bootstrap needs without nonces. Firebase's proxied sign-in pages (`/__/auth/*`) keep Firebase's own headers.
+
+## Database access (RLS)
+
+The API writes with the service-role key. Browser clients (anon key and a user session) can only **read** their own workspace through PostgREST, and can't change their own role or workspace (`seed/migrations/003_security_hardening.sql`).
+
+## Container
+
+The API image runs as an unprivileged user (`appuser`, uid 10001).
 
 ## Supabase dashboard settings (can't be done from the code)
 

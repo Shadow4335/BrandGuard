@@ -44,20 +44,20 @@ def fresh_email():
 def test_first_sign_in_creates_account_with_chosen_role_then_reuses_it(monkeypatch):
     email = fresh_email()
     monkeypatch.setattr(core, "verify_firebase_token", google_account(email))
-    first = sign_in(role="reviewer")
+    first = sign_in(role="creator")
     assert first.status_code == 200 and first.json()["created"] is True
     me = c.get("/api/me", headers={"Authorization": "Bearer " + first.json()["session"]["token"]}).json()
-    assert (me["email"], me["role"], me["full_name"]) == (email, "reviewer", "Gina Google")
+    assert (me["email"], me["role"], me["full_name"]) == (email, "creator", "Gina Google")
     again = sign_in(role="manager")  # the role only applies to a new account
-    assert again.json()["created"] is False and again.json()["session"]["role"] == "reviewer"
+    assert again.json()["created"] is False and again.json()["session"]["role"] == "creator"
 
 
 def test_links_to_existing_password_account(monkeypatch):
     email = fresh_email()
-    c.post("/api/auth/signup", json={"email": email, "password": "correct horse 1", "full_name": "Pat", "role": "manager"})
+    c.post("/api/auth/signup", json={"email": email, "password": "correct horse 1", "full_name": "Pat", "role": "creator"})
     monkeypatch.setattr(core, "verify_firebase_token", google_account(email))
     r = sign_in()
-    assert r.status_code == 200 and r.json()["created"] is False and r.json()["session"]["role"] == "manager"
+    assert r.status_code == 200 and r.json()["created"] is False and r.json()["session"]["role"] == "creator"
 
 
 def test_rejects_invalid_token_unverified_email_admin_role_and_demo_addresses(monkeypatch):
@@ -160,9 +160,9 @@ def test_new_user_whether_or_not_the_early_link_made_the_auth_user(monkeypatch, 
     fake = FakeSupabase([], link_makes_user=link_makes_user)
     supabase(fake)
     monkeypatch.setattr(core, "verify_firebase_token", google_account("new@gmail.com"))
-    r = sign_in(role="reviewer")
+    r = sign_in(role="creator")
     assert r.status_code == 200, r.text
-    assert r.json()["created"] is True and r.json()["profile"]["role"] == "reviewer"
+    assert r.json()["created"] is True and r.json()["profile"]["role"] == "creator"
     assert fake.calls == calls and fake.profiles[0]["id"] == uid
 
 

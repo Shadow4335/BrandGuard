@@ -1,8 +1,29 @@
 import type { NextConfig } from "next";
 
-// Basic browser protections on every page. There's deliberately no Content-Security-Policy: Next.js inline scripts
-// need nonces, so a CSP should be added on purpose and tested, not as a blanket header.
+const isDev = process.env.NODE_ENV !== "production";
+const origin = (url?: string) => { try { return url ? new URL(url).origin : ""; } catch { return ""; } };
+const apiOrigin = origin(process.env.NEXT_PUBLIC_API_URL) || "http://localhost:8000";
+
+// Content-Security-Policy. 'unsafe-inline' scripts are still needed for Next.js's inline bootstrap (nonces would make
+// every page dynamic); apis.google.com and the Firebase/Google hosts are for Google sign-in. connect-src lists the API,
+// Supabase and Google's auth endpoints explicitly. Dev mode also needs eval and the hot-reload websocket.
+const csp = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline' https://apis.google.com${isDev ? " 'unsafe-eval'" : ""}`,
+  `connect-src 'self' ${apiOrigin} https://*.supabase.co https://*.googleapis.com${isDev ? " ws: wss:" : ""}`,
+  "img-src 'self' data: blob: https:",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self' data:",
+  "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com",
+  "frame-ancestors 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join("; ");
+
+// Browser protections on every page.
 const securityHeaders = [
+  { key: "Content-Security-Policy", value: csp },
   { key: "X-Content-Type-Options", value: "nosniff" },
   // SAMEORIGIN, not DENY: our own pages frame Firebase's sign-in iframe, which is served from this domain (below)
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
@@ -19,7 +40,8 @@ const firebaseProject = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 
 const nextConfig: NextConfig = {
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    // Every path except the proxied Firebase sign-in pages, which keep Firebase's own headers (our CSP would block them)
+    return [{ source: "/:path((?!__/auth/).*)", headers: securityHeaders }];
   },
   async rewrites() {
     if (!firebaseProject) return [];

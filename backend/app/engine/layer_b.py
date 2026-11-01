@@ -45,7 +45,11 @@ class AIOutput(BaseModel):
 
 def build_prompt(ctx: ReviewContext, sources: List[RetrievedSource]) -> str:
     src = json.dumps([{"code": s.code, "kind": s.kind, "text": s.text} for s in sources], ensure_ascii=False)
-    return f"SOURCES: {src}\nCHANNEL: {ctx.channel}   AI_GENERATED: {ctx.ai_generated}\n<content>{ctx.text}</content>"
+    # The submitted text is untrusted: neutralise <content> tags so it can't close the block and add instructions
+    # outside it, and keep the channel to one line with no markup.
+    safe_text = re.sub(r"</?content\b[^>]*>", "[content-tag]", ctx.text, flags=re.IGNORECASE)
+    safe_channel = re.sub(r"[\r\n<>]", " ", str(ctx.channel))
+    return f"SOURCES: {src}\nCHANNEL: {safe_channel}   AI_GENERATED: {ctx.ai_generated}\n<content>{safe_text}</content>"
 
 
 # ---------- grounding ----------

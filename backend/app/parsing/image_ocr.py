@@ -1,8 +1,16 @@
 import io
 from typing import Tuple
 
+from PIL import Image
+
 from app.config import get_settings
 from app.parsing import ParsedDoc, UploadError
+
+# Decompression bombs: a small file that decodes to a huge image. Pillow raises DecompressionBombError above twice this
+# (and only warns between 1x and 2x), so parse_image also checks the size itself.
+MAX_PIXELS = 25_000_000
+Image.MAX_IMAGE_PIXELS = MAX_PIXELS
+TOO_BIG = "Image resolution exceeds 25 MP safety limit."
 
 MAX_SIDE = 2500   # very large photos are downscaled for OCR speed
 MIN_SIDE = 1400   # small or low-contrast images are upscaled so Tesseract can read them
@@ -37,11 +45,15 @@ def ocr_text(img) -> str:
 
 
 def parse_image(data: bytes, content_type: str = "") -> ParsedDoc:
-    from PIL import Image, UnidentifiedImageError
+    from PIL import UnidentifiedImageError
     try:
-        raw = Image.open(io.BytesIO(data))
+        raw = Image.open(io.BytesIO(data))  # reads the header only, so the size is known before decoding
+        if raw.width * raw.height > MAX_PIXELS:
+            raise UploadError(TOO_BIG, 413)
         fmt = (raw.format or "png").lower()
         img = raw.convert("RGB")
+    except Image.DecompressionBombError:
+        raise UploadError(TOO_BIG, 413)
     except (UnidentifiedImageError, OSError):
         raise UploadError("We couldn't open that image. Upload a PNG, JPG, WEBP or GIF.", 415)
     fmt = {"jpg": "jpeg", "mpo": "jpeg"}.get(fmt, fmt)

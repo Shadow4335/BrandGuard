@@ -37,6 +37,12 @@ def cache_user(token: str, user: "UserContext", token_expires_at: Optional[float
         _token_cache[_digest(token)] = (until, user)
 
 
+def evict_token(token: str) -> None:
+    """Forget a cached token, e.g. on sign-out, so it stops working here straight away."""
+    with _token_lock:
+        _token_cache.pop(_digest(token), None)
+
+
 def cached_user(token: str) -> Optional["UserContext"]:
     with _token_lock:
         entry = _token_cache.get(_digest(token))

@@ -2,7 +2,9 @@
 import json
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from collections import defaultdict, deque
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from app.audit import log_event
@@ -12,10 +14,20 @@ from app.models import Finding, ReviewRun
 from app.models.api import ContentDetail, FindingDecisionIn, ReviewResult, VersionCreateIn
 from app.models.enums import UserRole
 from app.routers.content import build_detail, get_content_or_404
+from app.routers.core import throttle
 from app.store import get_store
 
 router = APIRouter(prefix="/api", tags=["Review"])
 EDITABLE = ("draft", "checked", "changes_requested", "rejected", "approved")
+
+
+REVIEW_LIMIT, REVIEW_WINDOW = 15, 600  # AI reviews per user per 10 minutes (each one calls the LLM)
+_reviews: dict = defaultdict(deque)
+
+
+def _limit_reviews(request: Request, user: UserContext) -> None:
+    throttle(_reviews, request, REVIEW_LIMIT, "You've run a lot of reviews in a short time. Please wait a few minutes "
+             "and try again.", REVIEW_WINDOW, key=str(user.user_id))
 
 
 def _own_content(content_id: str, user: UserContext) -> dict:
@@ -36,9 +48,10 @@ def _result(done: dict) -> ReviewResult:
 
 
 @router.post("/content/{content_id}/review", response_model=ReviewResult)
-def run_review(content_id: str, user: UserContext = Depends(require_roles(UserRole.CREATOR))):
+def run_review(content_id: str, request: Request, user: UserContext = Depends(require_roles(UserRole.CREATOR))):
     content = _own_content(content_id, user)
     _require_editable(content)
+    _limit_reviews(request, user)
     done = None
     for ev in review_steps(content, user.user_id, user.org_id):
         done = ev
@@ -46,9 +59,10 @@ def run_review(content_id: str, user: UserContext = Depends(require_roles(UserRo
 
 
 @router.post("/content/{content_id}/review/stream")
-def run_review_stream(content_id: str, user: UserContext = Depends(require_roles(UserRole.CREATOR))):
+def run_review_stream(content_id: str, request: Request, user: UserContext = Depends(require_roles(UserRole.CREATOR))):
     content = _own_content(content_id, user)
     _require_editable(content)
+    _limit_reviews(request, user)
 
     def gen():
         try:

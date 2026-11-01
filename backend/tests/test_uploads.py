@@ -181,3 +181,62 @@ def test_admin_can_add_sources_from_files():
         assert r.status_code == 200 and r.json()["chunk_count"] >= 1, (name, r.text)
     r = c.post("/api/sources", headers=h, data={"kind": "guideline", "title": "x"}, files={"file": ("x.pptx", b"PK", "application/octet-stream")})
     assert r.status_code == 415
+
+
+# --- size and expansion limits ---
+
+def docx_bomb() -> bytes:
+    """A valid zip whose single entry expands from a few KB to 60 MB (highly compressible)."""
+    import zipfile
+    b = io.BytesIO()
+    with zipfile.ZipFile(b, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("[Content_Types].xml", "<Types/>")
+        z.writestr("word/document.xml", "a" * (60 * 1024 * 1024))
+    return b.getvalue()
+
+
+def test_docx_that_expands_too_far_is_rejected():
+    data = docx_bomb()
+    assert len(data) < 1024 * 1024  # small on the wire
+    r, _ = upload("bomb.docx", data, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    assert r.status_code == 413 and "50 MB" in r.json()["detail"]
+
+
+def test_pdf_over_100_pages_is_rejected():
+    d = fitz.open()
+    for _ in range(101):
+        d.new_page().insert_text((72, 72), "page")
+    r, _ = upload("long.pdf", d.tobytes(), "application/pdf")
+    assert r.status_code == 413 and "100-page" in r.json()["detail"]
+
+
+def test_image_over_25_megapixels_is_rejected():
+    b = io.BytesIO()
+    Image.new("1", (6000, 5000)).save(b, "PNG")  # 30 MP, tiny file
+    r, _ = upload("huge.png", b.getvalue(), "image/png")
+    assert r.status_code == 413 and "25 MP" in r.json()["detail"]
+
+
+def test_long_pdf_text_is_cut_with_a_note():
+    from app.parsing.pdf import MAX_TEXT_CHARS, parse_pdf
+    d = fitz.open()
+    for _ in range(60):
+        d.new_page().insert_textbox(fitz.Rect(20, 20, 590, 820), "word " * 1500, fontsize=4)
+    doc = parse_pdf(d.tobytes())
+    assert len(doc.text) == MAX_TEXT_CHARS and "first" in (doc.note or "")
+
+
+def test_brand_sources_are_capped():
+    from app.routers.sources import MAX_SOURCE_CHARS
+    h = login("admin")
+    r = c.post("/api/sources", headers=h, data={"kind": "guideline", "title": "Too long", "text": "a " * MAX_SOURCE_CHARS})
+    assert r.status_code == 413
+
+
+def test_ai_reviews_are_rate_limited_per_user(monkeypatch):
+    from app.routers import review as review_router
+    monkeypatch.setattr(review_router, "REVIEW_LIMIT", 2)
+    r, h = upload("post.txt", TEXT.encode(), "text/plain")
+    cid = r.json()["id"]
+    codes = [c.post(f"/api/content/{cid}/review", headers=h).status_code for _ in range(3)]
+    assert codes == [200, 200, 429]

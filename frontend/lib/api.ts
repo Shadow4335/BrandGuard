@@ -87,13 +87,14 @@ export const api = {
   demoSession: (role: string) => call<{ access_token: string; refresh_token: string }>("POST", "/api/auth/demo-session", { role }),
   demoLogin: (role: string) => call<DemoSession>("POST", "/api/auth/demo-login", { role }),
   login: (email: string, password: string) => call<DemoSession>("POST", "/api/auth/login", { email, password }),
-  googleLogin: (id_token: string, role?: string) =>
+  googleLogin: (id_token: string, role?: string, invite_code?: string) =>
     call<{
       mode: "supabase" | "memory"; created: boolean; access_token?: string; refresh_token?: string;
       session?: DemoSession | null; profile?: Profile | null;
-    }>("POST", "/api/auth/google", { id_token, role }),
+    }>("POST", "/api/auth/google", { id_token, role, invite_code }),
+  logout: () => call<{ ok: boolean }>("POST", "/api/auth/logout"),
   me: () => call<{ user_id: string; email: string; org_id: string; role: string; full_name?: string | null }>("GET", "/api/me"),
-  signup: (body: { email: string; password: string; full_name: string; role: string }) =>
+  signup: (body: { email: string; password: string; full_name: string; role: string; invite_code?: string }) =>
     call<{ email: string; role: string; mode: "supabase" | "memory"; session?: DemoSession | null }>("POST", "/api/auth/signup", body),
 
   sources: () => call<Source[]>("GET", "/api/sources"),

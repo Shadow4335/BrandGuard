@@ -47,15 +47,21 @@ def test_signup_then_full_creator_flow():
 
 def test_login_after_signup_and_wrong_password():
     email = new_email()
-    signup(email, role="reviewer")
+    signup(email)
     ok = c.post("/api/auth/login", json={"email": email.upper(), "password": "correct horse 1"})
-    assert ok.status_code == 200 and ok.json()["role"] == "reviewer"
+    assert ok.status_code == 200 and ok.json()["role"] == "creator"
     assert c.post("/api/auth/login", json={"email": email, "password": "nope nope"}).status_code == 401
     assert c.post("/api/auth/login", json={"email": "creator@demo.test", "password": "x"}).status_code == 401
 
 
-def test_each_role_can_sign_up_and_is_enforced():
-    for role in ["manager", "reviewer"]:  # admin isn't self-service by default (see test_auth_hardening)
+def test_self_signup_is_creator_only_by_default():
+    for role in ["manager", "reviewer", "admin"]:
+        assert signup(new_email(), role=role).status_code == 403
+
+
+def test_widened_signup_roles_are_still_enforced(monkeypatch):
+    monkeypatch.setenv("SIGNUP_ALLOWED_ROLES", "creator,manager,reviewer")
+    for role in ["manager", "reviewer"]:
         r = signup(new_email(), role=role)
         h = {"Authorization": "Bearer " + r.json()["session"]["token"]}
         created = c.post("/api/content", headers=h, data={"title": "t", "text": "hello you"})
@@ -87,3 +93,19 @@ def test_password_hash_never_returned():
     r = signup(new_email())
     h = {"Authorization": "Bearer " + r.json()["session"]["token"]}
     assert "pw" not in r.text and "pw" not in c.get("/api/me", headers=h).text
+
+
+def test_creators_cannot_see_each_others_content():
+    a = {"Authorization": "Bearer " + signup(new_email()).json()["session"]["token"]}
+    b = {"Authorization": "Bearer " + signup(new_email()).json()["session"]["token"]}
+    cid = c.post("/api/content", headers=a, data={"title": "A's draft", "text": "hello you"}).json()["id"]
+    assert c.get(f"/api/content/{cid}", headers=a).status_code == 200
+    # Creator B gets the same 404 as for a missing item, on every route that takes the ID
+    assert c.get(f"/api/content/{cid}", headers=b).status_code == 404
+    assert c.get(f"/api/content/{cid}/image", headers=b).status_code == 404
+    assert c.post(f"/api/content/{cid}/comments", headers=b, json={"body": "hi"}).status_code == 404
+    assert c.get(f"/api/audit?content_id={cid}", headers=b).status_code == 404
+    assert c.post(f"/api/content/{cid}/review", headers=b).status_code == 404
+    # Reviewers still see everything in the workspace
+    m = c.post("/api/auth/demo-login", json={"role": "manager"}).json()["token"]
+    assert c.get(f"/api/content/{cid}", headers={"Authorization": "Bearer " + m}).status_code == 200

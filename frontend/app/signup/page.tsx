@@ -19,11 +19,17 @@ const ROLES: { value: UserRole; label: string; desc: string }[] = [
 export default function SignupPage() {
   const router = useRouter();
   const { signUp, error } = useAuth();
-  const [form, setForm] = useState({ full_name: "", email: "", password: "", role: "creator" as UserRole });
+  const [form, setForm] = useState({ full_name: "", email: "", password: "", role: "creator" as UserRole, invite_code: "" });
   const [busy, setBusy] = useState(false);
   const [local, setLocal] = useState<string | null>(null);
-  const [allowed, setAllowed] = useState<UserRole[]>(["creator", "manager", "reviewer"]);
-  useEffect(() => { api.health().then((h) => h.signup_roles?.length && setAllowed(h.signup_roles)).catch(() => {}); }, []);
+  const [allowed, setAllowed] = useState<UserRole[]>(["creator"]);
+  const [mode, setMode] = useState<"open" | "invite" | "closed">("open");
+  useEffect(() => {
+    api.health().then((h) => {
+      if (h.signup_roles?.length) setAllowed(h.signup_roles);
+      if (h.signup) setMode(h.signup);
+    }).catch(() => {});
+  }, []);
   const MIN = 10;
   const left = Math.max(0, MIN - form.password.length);
 
@@ -31,7 +37,7 @@ export default function SignupPage() {
     e.preventDefault();
     if (form.password.length < MIN) { setLocal(`Use a password with at least ${MIN} characters.`); return; }
     setLocal(null); setBusy(true);
-    const ok = await signUp(form);
+    const ok = await signUp({ ...form, invite_code: form.invite_code.trim() || undefined });
     setBusy(false);
     if (ok) router.push("/dashboard");
   }
@@ -45,6 +51,11 @@ export default function SignupPage() {
         guidelines, approved facts and sample history already set up. Your account is ready immediately; no email confirmation. Your password is stored only as a salted hash and is never visible to anyone, including us.
       </p>
       <ErrorNote message={local || error} />
+      {mode === "closed" && (
+        <p role="status" className="rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950">
+          Sign-up is closed on this server. Ask an admin to create your account, or <Link href="/login" className="underline">sign in</Link>.
+        </p>
+      )}
       <form onSubmit={submit} className="space-y-4 rounded-xl border border-zinc-300 bg-white p-5">
         <label className="block text-sm font-medium">Your name
           <input required autoComplete="name" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className={input} />
@@ -58,6 +69,11 @@ export default function SignupPage() {
             {left > 0 ? `${left} more character${left === 1 ? "" : "s"} needed. ` : "Long enough. "}A few unrelated words works well. Avoid common passwords, your name or email, and the product name.
           </span>
         </label>
+        {mode === "invite" && (
+          <label className="block text-sm font-medium">Invite code
+            <input required autoComplete="off" value={form.invite_code} onChange={(e) => setForm({ ...form, invite_code: e.target.value })} className={input} />
+          </label>
+        )}
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium">Your role</legend>
           {ROLES.filter((r) => allowed.includes(r.value)).map((r) => (
@@ -66,13 +82,15 @@ export default function SignupPage() {
               <span><strong className="text-sm">{r.label}</strong><br /><span className="text-xs text-zinc-700">{r.desc}</span></span>
             </label>
           ))}
-          {!allowed.includes("admin") && <p className="text-xs text-zinc-700">Admin accounts can&apos;t be created here, because admins change the shared brand sources. Use the one-click Admin demo on the <Link href="/login" className="underline">sign-in page</Link> to see that view.</p>}
+          {allowed.length === 1 && <p className="text-xs text-zinc-700">New accounts start as {ROLES.find((r) => r.value === allowed[0])?.label ?? allowed[0]}. Managers, reviewers and admins approve content or change the shared brand sources, so an admin assigns those roles.</p>}
         </fieldset>
-        <button disabled={busy} className="w-full rounded-lg bg-indigo-700 text-white px-4 py-2.5 font-medium disabled:opacity-50">
+        <button disabled={busy || mode === "closed"} className="w-full rounded-lg bg-indigo-700 text-white px-4 py-2.5 font-medium disabled:opacity-50">
           {busy ? "Creating your account..." : "Create account"}
         </button>
       </form>
-      <GoogleSignIn role={form.role} label="Sign up with Google as the role above" />
+      {mode !== "closed" && (
+        <GoogleSignIn role={form.role} inviteCode={form.invite_code.trim() || undefined} label="Sign up with Google" />
+      )}
       <p className="text-sm text-zinc-800">
         Already have an account? <Link href="/login" className="underline font-medium">Sign in</Link>. Want to try every role without an account? Use the one-click demo buttons on the <Link href="/login" className="underline font-medium">sign-in page</Link>.
       </p>
