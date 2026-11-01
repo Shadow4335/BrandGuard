@@ -37,6 +37,7 @@ const securityHeaders = [
 // breaks or delays Google sign-in. With NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN set to this site's domain, Firebase loads them
 // from here instead (Firebase's recommended setup). Locally the auth domain stays <project>.firebaseapp.com.
 const firebaseProject = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+const supabaseOrigin = origin(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
 const nextConfig: NextConfig = {
   async headers() {
@@ -44,9 +45,14 @@ const nextConfig: NextConfig = {
     return [{ source: "/:path((?!__/auth/).*)", headers: securityHeaders }];
   },
   async rewrites() {
-    if (!firebaseProject) return [];
-    const firebaseHost = `https://${firebaseProject}.firebaseapp.com`;
-    return [{ source: "/__/auth/:path*", destination: `${firebaseHost}/__/auth/:path*` }];
+    const rules = [];
+    if (firebaseProject) {
+      const firebaseHost = `https://${firebaseProject}.firebaseapp.com`;
+      rules.push({ source: "/__/auth/:path*", destination: `${firebaseHost}/__/auth/:path*` });
+    }
+    // Browsers talk to Supabase through this domain (see lib/supabase.ts): some networks block supabase.co
+    if (supabaseOrigin) rules.push({ source: "/supabase/:path*", destination: `${supabaseOrigin}/:path*` });
+    return rules;
   },
   cacheComponents: true,
   partialPrefetching: true,
