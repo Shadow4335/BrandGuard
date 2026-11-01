@@ -7,6 +7,8 @@ import { api } from "@/lib/api";
 import { firebaseConfigured, loadFirebase } from "@/lib/firebase";
 import type { UserRole } from "@/lib/types";
 
+const PREPARE_TIMEOUT_MS = 5000;
+
 /** "Continue with Google". Only shown when the browser has the Firebase config and the API says it's set up too. */
 export function GoogleSignIn({ role, label = "Continue with Google" }: { role?: UserRole; label?: string }) {
   const router = useRouter();
@@ -23,8 +25,10 @@ export function GoogleSignIn({ role, label = "Continue with Google" }: { role?: 
         if (!h.firebase_enabled) return;
         setAvailable(true);
         // Enable the button once Firebase is fully loaded, so the click opens the popup straight away. If loading
-        // fails, enable it anyway: the click then retries the load (and the popup may be blocked, with a clear message).
-        loadFirebase().catch(() => {}).finally(() => setPrepared(true));
+        // fails or is slow (a slow network can hold the sign-in iframe up for a long time), enable it anyway after a
+        // few seconds: the click then finishes the load first, and the popup may be blocked with a clear message.
+        const giveUp = setTimeout(() => setPrepared(true), PREPARE_TIMEOUT_MS);
+        loadFirebase().catch(() => {}).finally(() => { clearTimeout(giveUp); setPrepared(true); });
       })
       .catch(() => {});
   }, [router]);
