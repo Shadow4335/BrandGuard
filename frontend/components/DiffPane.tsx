@@ -10,7 +10,7 @@ export function DiffPane({ oldText, newText, oldLabel, newLabel }: { oldText: st
   if (oldText === newText) return <p className="text-sm text-zinc-800">No text changes between these versions.</p>;
   return (
     <div className="overflow-x-auto rounded-lg border border-zinc-300 text-sm">
-      <ReactDiffViewer oldValue={oldText} newValue={newText} splitView={false} compareMethod={"diffWords" as never}
+      <ReactDiffViewer oldValue={oldText} newValue={newText} splitView={false} compareMethod={"diffWords" as never} disableWorker
         leftTitle={oldLabel} rightTitle={newLabel} />
     </div>
   );
