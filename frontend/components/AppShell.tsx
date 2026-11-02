@@ -3,7 +3,8 @@
 import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, BookOpen, ChartNoAxesCombined, ClipboardList, Info, LayoutDashboard, LogOut, Plus, ShieldCheck } from "lucide-react";
+import { ArrowUpRight, BookOpen, ChartNoAxesCombined, ClipboardList, Info, LayoutDashboard, LogOut, Plus } from "lucide-react";
+import { BrandMark } from "./BrandMark";
 import { useAuth } from "@/lib/auth-context";
 import { WorkspaceSelector } from "./WorkspaceSelector";
 import { RoleSwitcher } from "./RoleSwitcher";
@@ -22,7 +23,7 @@ const LINKS = [
   { href: "/about-ai", label: "About AI", icon: Info },
 ];
 export function BrandLogo() {
-  return <span className="brand-logo"><ShieldCheck size={28} strokeWidth={1.5} /><span>BrandGuard</span></span>;
+  return <span className="brand-logo"><BrandMark /><span>BrandGuard</span></span>;
 }
 function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname() || "/";

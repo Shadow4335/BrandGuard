@@ -3,7 +3,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, ShieldCheck } from "lucide-react";
+import { LogOut } from "lucide-react";
+import { BrandMark } from "@/components/BrandMark";
 import { useAuth } from "@/lib/auth-context";
 import { RoleSwitcher } from "@/components/RoleSwitcher";
 
@@ -49,7 +50,7 @@ export function Navbar() {
     <header className="border-b border-zinc-200 bg-white md:sticky md:top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 min-h-14 py-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
         <Link href={user ? "/dashboard" : "/"} className="flex items-center gap-2 font-bold text-lg">
-          <span className="w-8 h-8 rounded-lg bg-indigo-700 text-white flex items-center justify-center"><ShieldCheck className="w-5 h-5" /></span>
+          <BrandMark />
           <span>BrandGuard</span>
         </Link>
         {user && profile && (

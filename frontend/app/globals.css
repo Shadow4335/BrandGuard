@@ -29,7 +29,8 @@ h1,h2,h3,h4 { line-height:1.2; }
 h1 { letter-spacing:-.04em; } h2 { letter-spacing:-.025em; }
 button { min-height:44px; } a { text-underline-offset:4px; }
 .skip-link { position:fixed; left:16px; top:-100px; z-index:100; padding:12px 20px; background:var(--paper); color:var(--ink); border-radius:8px; }.skip-link:focus { top:12px; }
-.brand-logo { display:flex; align-items:center; gap:9px; font-size:24px; letter-spacing:-.055em; font-weight:600; white-space:nowrap; }
+.brand-logo { display:flex; align-items:center; gap:10px; font-size:24px; letter-spacing:-.04em; font-weight:500; white-space:nowrap; }
+.brand-mark { height:1.25em; width:auto; flex-shrink:0; }
 .eyebrow { font-size:11px; text-transform:uppercase; letter-spacing:.18em; font-weight:500; }
 .pill-button { display:inline-flex; align-items:center; justify-content:center; gap:28px; border-radius:999px; padding:14px 23px; background:var(--paper); color:var(--ink); font-size:13px; font-weight:500; min-height:48px; text-decoration:none; }
 .pill-button.dark { background:var(--ink); color:var(--paper); }
