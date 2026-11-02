@@ -67,14 +67,24 @@ async function parse<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+// Long enough for a sleeping server to wake and for every AI provider to time out, so only a truly stuck request is cut
+const REQUEST_TIMEOUT_MS = 180_000;
+
+function offline(e: unknown): ApiError {
+  return (e as Error).name === "TimeoutError"
+    ? new ApiError("The server took too long to answer. Please try again.", 0)
+    : new ApiError("Can't reach the BrandGuard server. It may be waking up; wait a few seconds and retry.", 0);
+}
+
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${API_BASE}${path}`, {
       method, headers: await authHeaders(), body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
-  } catch {
-    throw new ApiError("Can't reach the BrandGuard server. It may be waking up; wait a few seconds and retry.", 0);
+  } catch (e) {
+    throw offline(e);
   }
   return parse<T>(res);
 }
@@ -82,9 +92,9 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 async function upload<T>(path: string, form: FormData): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${path}`, { method: "POST", headers: await authHeaders(false), body: form });
-  } catch {
-    throw new ApiError("Can't reach the BrandGuard server. It may be waking up; wait a few seconds and retry.", 0);
+    res = await fetch(`${API_BASE}${path}`, { method: "POST", headers: await authHeaders(false), body: form, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+  } catch (e) {
+    throw offline(e);
   }
   return parse<T>(res);
 }
@@ -132,16 +142,17 @@ export const api = {
   reviewStream: async (id: string, onEvent: (e: { stage: string; message: string; result?: ReviewResult }) => void) => {
     let res: Response;
     try {
-      res = await fetch(`${API_BASE}/api/content/${id}/review/stream`, { method: "POST", headers: await authHeaders() });
-    } catch {
-      throw new ApiError("Can't reach the BrandGuard server. It may be waking up; wait a few seconds and retry.", 0);
+      res = await fetch(`${API_BASE}/api/content/${id}/review/stream`, { method: "POST", headers: await authHeaders(), signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+    } catch (e) {
+      throw offline(e);
     }
     if (!res.ok || !res.body) { await parse(res); return; }
     const reader = res.body.getReader();
     const dec = new TextDecoder();
     let buf = "";
     for (;;) {
-      const { value, done } = await reader.read();
+      let value: Uint8Array | undefined, done: boolean;
+      try { ({ value, done } = await reader.read()); } catch (e) { throw offline(e); } // cut off, or stalled past the timeout
       if (done) break;
       buf += dec.decode(value, { stream: true });
       let i;

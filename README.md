@@ -22,7 +22,7 @@
    - **Layer B** is grounded AI: the model sees only the sources retrieved for that content (pgvector retrieval), and its JSON output is validated. Citations outside the retrieved set are downgraded to *Unsupported claim*; spans that can't be located are dropped. With no key, or on timeout or error, an offline heuristic produces the same shape and a visible notice says so.
 4. **Explain and cite.** Every finding shows Issue, Why, a rule/source chip (click it to read the approved excerpt), Fix, Severity and Confidence.
 5. **Human decisions.** Creators Accept, Edit or Reject each suggestion (rejections need a reason). *Save as new version* builds the next version only from those decisions, and a diff shows exactly what changed.
-6. **Workflow.** Draft → submitted → manager review / escalation → reviewer approval, with comments. Approving with unresolved high-severity findings requires a written override reason. Every step lands in the audit trail.
+6. **Workflow.** Draft → submitted → manager review / escalation → reviewer approval, with comments. Approving with unresolved high-severity findings requires a written override reason, whoever approves. Every step lands in the audit trail.
 7. **Insights.** The `/insights` page (admin) charts review volume, the most-overridden rules, and flags "Guidelines that may be unclear".
 8. **Transparency.** `/about-ai` and [AI_AND_SERVICES.md](AI_AND_SERVICES.md) describe what AI does and which services see data.
 
@@ -43,7 +43,7 @@ The demo brand is **GlowLeaf Naturals**, a fictional Indian personal-care brand.
 2. **Accept** two suggestions, **Edit** one, **Reject** one (with a reason) → *Save as new version* → the diff shows exactly those changes.
 3. *Submit for review*.
 4. Use the **role switcher**: **Manager** → open the item, comment, **Escalate**.
-5. **Reviewer** → **Approve**. High-severity findings are unresolved, so a written override reason is required.
+5. **Reviewer** → **Approve**. High-severity findings are unresolved, so a written override reason is required (the Manager's Approve asks for one too).
 6. Open the audit trail on the item, then **Admin** → *Insights*.
 
 Samples: 1 is a marketing claim post, 2 an influencer post (missing #Ad and AI label), 3 a poster image (contrast and missing alt-text), 4 is clean.
@@ -52,31 +52,60 @@ The role switcher is shown only while signed in as a demo user; otherwise sign o
 
 ## Run locally
 
-Prerequisites: Python 3.11+, Node.js 20+, and Tesseract for OCR (`brew install tesseract` on macOS; set `TESSERACT_CMD` if it isn't on `PATH`).
+Prerequisites: Python 3.11+, Node.js 20.9+, and Tesseract for OCR on images and scanned PDFs (`brew install tesseract` on macOS, `apt install tesseract-ocr` on Debian/Ubuntu; set `TESSERACT_CMD` if it isn't on `PATH`).
+
+```bash
+git clone https://github.com/Shadow4335/BrandGuard.git && cd BrandGuard
+```
 
 ### Offline mode (no accounts, no keys)
 
-With no Supabase credentials the API uses a seeded in-memory store, and with no LLM key the rule-based fallback replaces Layer B. Set `DEMO_MODE=true` to get the one-click demo accounts (it is off by default).
+With no Supabase credentials the API uses a seeded in-memory store, and with no LLM key the rule-based fallback replaces Layer B. Set `DEMO_MODE=true` to get the one-click demo accounts (it is off by default). You don't need a `backend/.env` for this.
+
+Terminal 1, from the repository root:
 
 ```bash
 cd backend && python3 -m venv .venv && source .venv/bin/activate
+```
+
+```bash
 pip install -r requirements.txt
+```
+
+```bash
 DEMO_MODE=true uvicorn app.main:app --port 8000
 ```
+
+Terminal 2, from the repository root:
 
 ```bash
 cd frontend && cp .env.example .env.local && npm install && npm run dev
 ```
 
-Open http://localhost:3000 and follow the walkthrough above. In-memory data resets when the API restarts.
+Open http://localhost:3000, click **Sign in**, pick a role under the demo accounts, and follow the walkthrough above. In-memory data resets when the API restarts, and demo sessions end with it: if the app says it can't load your workspace, sign out and pick a role again.
 
 In Claude Code, `.claude/launch.json` defines `api`, `web`, and fully offline `api-offline` (port 8001) / `web-offline` (port 3001) servers.
 
-Tests (offline, no keys):
+Tests and checks (offline, no keys), from the repository root:
 
 ```bash
-cd backend && python -m pytest -q
+cd backend && .venv/bin/python -m pytest -q
 ```
+
+```bash
+cd frontend && npx tsc --noEmit && npm run lint && npm run build
+```
+
+### Troubleshooting
+
+| What you see | What to do |
+|---|---|
+| No demo accounts on the sign-in page | Start the API with `DEMO_MODE=true`, then reload. |
+| "Sign-up is closed on this server" | Same: use `DEMO_MODE=true`, or set `SIGNUP_ORG_ID` or `SIGNUP_INVITE_CODE`. |
+| "Can't reach the BrandGuard server" | The API isn't running on the port in `NEXT_PUBLIC_API_URL` (`frontend/.env.local`). |
+| CORS errors in the browser console | Serving the frontend somewhere other than `localhost:3000`? Add its address to `ALLOWED_ORIGINS` for the API. |
+| Images or scanned PDFs have no extracted text | Tesseract isn't installed or isn't on `PATH`. |
+| The orange "AI layer unavailable" notice | Expected with no LLM key: rule checks and the offline fallback still run. |
 
 ### With Supabase and a live LLM
 

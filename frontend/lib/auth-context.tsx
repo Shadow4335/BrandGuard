@@ -4,7 +4,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase";
 import { Profile, UserRole } from "@/lib/types";
-import { api, getDemoSession, setDemoSession, setFreshToken, getWorkspaceId, setWorkspaceId, DemoSession } from "@/lib/api";
+import { api, ApiError, getDemoSession, setDemoSession, setFreshToken, getWorkspaceId, setWorkspaceId, DemoSession } from "@/lib/api";
 import { signInWithGooglePopup } from "@/lib/firebase";
 
 const DEMO_ROLES: Record<string, UserRole> = {
@@ -60,9 +60,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       let me;
       try { me = await api.me(); }
-      catch (e) { if (!getWorkspaceId()) throw e; setWorkspaceId(null); me = await api.me(); }
+      catch (e) { if (!getWorkspaceId() || (e as ApiError).status === 0) throw e; setWorkspaceId(null); me = await api.me(); }
       setProfile({ id: userId, org_id: me.org_id, role: me.role as UserRole, email: me.email, full_name: me.full_name });
-    } catch { setProfile(null); setError("Could not load your workspace. Please sign in again."); }
+    } catch (e) { setProfile(null); setError((e as ApiError).status === 0 ? (e as ApiError).message : "Could not load your workspace. Please sign in again."); }
   }, []);
 
   useEffect(() => {

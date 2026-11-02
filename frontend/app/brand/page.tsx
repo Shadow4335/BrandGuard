@@ -82,7 +82,7 @@ function Brand() {
           {profile?.role === "admin" && (
             <form onSubmit={add} className="rounded-lg border border-zinc-300 bg-white p-4 space-y-2">
               <h2 className="font-semibold">Add to {current.label}</h2>
-              <label className="block text-sm">Title<input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="mt-1 w-full border border-zinc-400 rounded px-2 py-1" /></label>
+              <label className="block text-sm">Title<input required maxLength={200} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="mt-1 w-full border border-zinc-400 rounded px-2 py-1" /></label>
               <label className="block text-sm">Code (for citations, e.g. FACT-013)<input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} className="mt-1 w-full border border-zinc-400 rounded px-2 py-1" /></label>
               <label className="block text-sm">Text<textarea required={!file} rows={4} value={form.text} onChange={(e) => setForm({ ...form, text: e.target.value })} className="mt-1 w-full border border-zinc-400 rounded px-2 py-1" /></label>
               <label className="block text-sm">...or upload a file (PDF, DOCX, image, TXT, HTML)

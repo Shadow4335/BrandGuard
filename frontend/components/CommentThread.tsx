@@ -8,10 +8,14 @@ import type { ContentDetail } from "@/lib/types";
 export function CommentThread({ detail, onChange }: { detail: ContentDetail; onChange: () => void }) {
   const [body, setBody] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   async function add(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
+    setBusy(true);
     try { await api.comment(detail.content.id, body); setBody(""); setErr(null); onChange(); }
     catch (x) { setErr((x as Error).message); }
+    finally { setBusy(false); }
   }
   return (
     <section aria-labelledby="comments" className="space-y-2">
@@ -25,8 +29,8 @@ export function CommentThread({ detail, onChange }: { detail: ContentDetail; onC
       {err && <p role="alert" className="text-sm text-red-800">{err}</p>}
       <form onSubmit={add} className="flex gap-2">
         <label className="sr-only" htmlFor="newcomment">Add a comment</label>
-        <input id="newcomment" value={body} onChange={(e) => setBody(e.target.value)} placeholder="Add a comment" className="flex-1 border border-zinc-400 rounded px-2 py-1 text-sm" />
-        <button disabled={!body.trim()} className="rounded bg-zinc-800 text-white px-3 py-1 text-sm disabled:opacity-50">Post</button>
+        <input id="newcomment" value={body} onChange={(e) => setBody(e.target.value)} maxLength={2000} placeholder="Add a comment" className="flex-1 border border-zinc-400 rounded px-2 py-1 text-sm" />
+        <button disabled={busy || !body.trim()} className="rounded bg-zinc-800 text-white px-3 py-1 text-sm disabled:opacity-50">Post</button>
       </form>
     </section>
   );

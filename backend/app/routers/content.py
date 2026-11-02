@@ -21,6 +21,7 @@ from app.store import get_store
 router = APIRouter(prefix="/api", tags=["Content"])
 CHANNELS = {"instagram_post", "website_page", "influencer_post", "press_release", "email"}
 UPLOAD_LIMIT, UPLOAD_WINDOW = 20, 600  # new content items per user per 10 minutes (parsing and OCR are expensive)
+MAX_TITLE_CHARS, MAX_TEXT_CHARS, MAX_COMMENT_CHARS = 200, 100_000, 2_000
 _uploads: dict = defaultdict(deque)
 
 
@@ -141,6 +142,10 @@ def create_content(  # sync on purpose: OCR/parsing runs in the worker pool, not
 ):
     if channel not in CHANNELS:
         raise HTTPException(400, f"Channel must be one of: {', '.join(sorted(CHANNELS))}.")
+    if len(title) > MAX_TITLE_CHARS:
+        raise HTTPException(413, f"That title is too long. Keep it under {MAX_TITLE_CHARS} characters.")
+    if text and len(text) > MAX_TEXT_CHARS:
+        raise HTTPException(413, f"That text is too long. Keep it under {MAX_TEXT_CHARS:,} characters.")
     throttle(_uploads, request, UPLOAD_LIMIT, "You've added a lot of content in a short time. Please wait a few "
              "minutes and try again.", UPLOAD_WINDOW, key=str(user.user_id))
     store, org = get_store(), str(user.org_id)
@@ -152,6 +157,8 @@ def create_content(  # sync on purpose: OCR/parsing runs in the worker pool, not
         except UploadError as e:
             raise HTTPException(e.status_code, e.message)
         body, file_type, note = doc.text or body, doc.file_type, doc.note
+        if len(body) > MAX_TEXT_CHARS:
+            raise HTTPException(413, f"That file has too much text. Keep it under {MAX_TEXT_CHARS:,} characters.")
         path = f"{org}/{user.user_id}/{storage_name(file.filename)}"
         try:
             store.put_file("submissions", path, data, mime_for(file_type, file.content_type))
@@ -202,8 +209,16 @@ def add_comment(content_id: str, body: CommentCreateIn, user: UserContext = Depe
     content = get_content_or_404(content_id, user)
     if not body.body.strip():
         raise HTTPException(400, "Write a comment first.")
+    if len(body.body) > MAX_COMMENT_CHARS:
+        raise HTTPException(413, f"That comment is too long. Keep it under {MAX_COMMENT_CHARS:,} characters.")
+    store = get_store()
+    if body.finding_id:
+        finding = store.get("findings", body.finding_id, str(user.org_id))
+        version = finding and store.get("content_versions", finding["content_version_id"])
+        if not version or version["content_item_id"] != content_id:
+            raise HTTPException(400, "That finding isn't part of this content.")
     ver = latest_version(content)
-    row = get_store().insert("comments", {"org_id": str(user.org_id), "finding_id": body.finding_id,
+    row = store.insert("comments", {"org_id": str(user.org_id), "finding_id": body.finding_id,
                                           "content_version_id": ver["id"], "author_id": str(user.user_id),
                                           "text": body.body.strip()})
     log_event(user.org_id, user.user_id, "comment_added", "content_item", content_id, {"role": user.role.value})

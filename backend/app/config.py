@@ -89,7 +89,8 @@ class Settings(BaseModel):
     @property
     def use_supabase(self) -> bool:
         """Supabase is used when credentials exist; otherwise an in-memory demo store."""
-        return bool(self.supabase_url and self.supabase_service_key) and not _flag("FORCE_MEMORY_STORE", "false")
+        configured = self.supabase_url and self.supabase_service_key and "your-project-id" not in self.supabase_url  # example .env
+        return bool(configured) and not _flag("FORCE_MEMORY_STORE", "false")
 
     @property
     def llm_available(self) -> bool:

@@ -4,8 +4,10 @@ draft --review--> checked --submit(creator)--> pending_manager ("In review")
 pending_manager --approve(manager)--> approved
 pending_manager --request_changes(manager, reason)--> changes_requested --new version--> checked
 pending_manager --escalate(manager)--> escalated
-escalated --approve(reviewer; written override reason if high-severity findings are unresolved)--> approved
+escalated --approve(reviewer)--> approved
 escalated --reject(reviewer, reason)--> rejected --new version--> checked
+
+Either approval needs a written override reason while high-severity findings are unresolved.
 """
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
@@ -63,7 +65,7 @@ def apply_transition(status: str, action: str, role: UserRole, findings: List[di
     if action in REASON_REQUIRED and not reason:
         raise TransitionError(400, "Please write a short reason; it is recorded in the audit trail.")
     is_override = False
-    if action == "approve" and role == UserRole.REVIEWER and unresolved_high(findings):
+    if action == "approve" and unresolved_high(findings):
         if not (override and len(reason) >= 5):
             raise TransitionError(409, f"{unresolved_high(findings)} high-severity finding(s) are still unresolved. "
                                        "Approving anyway is an override and needs a written reason.")

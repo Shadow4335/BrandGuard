@@ -20,6 +20,7 @@ from app.store import get_store
 router = APIRouter(prefix="/api", tags=["Brand"])
 KINDS = {"guideline", "terminology", "claim_library", "regulatory", "asset", "other"}
 MAX_SOURCE_CHARS, MAX_SOURCE_CHUNKS = 100_000, 200  # each chunk is embedded, so size drives cost and time
+MAX_TITLE_CHARS = 200
 SOURCE_LIMIT, SOURCE_WINDOW = 10, 600              # source uploads per user per 10 minutes
 _source_uploads: dict = defaultdict(deque)
 
@@ -43,6 +44,11 @@ def create_source(  # sync on purpose: OCR/parsing/embedding run in the worker p
 ):
     if kind not in KINDS:
         raise HTTPException(400, f"Kind must be one of: {', '.join(sorted(KINDS))}.")
+    title = title.strip()
+    if not title:
+        raise HTTPException(400, "Give this source a title.")
+    if len(title) > MAX_TITLE_CHARS:
+        raise HTTPException(413, f"That title is too long. Keep it under {MAX_TITLE_CHARS} characters.")
     if text and len(text) > MAX_SOURCE_CHARS:
         raise HTTPException(413, f"That text is too long. Keep a source under {MAX_SOURCE_CHARS:,} characters.")
     throttle(_source_uploads, request, SOURCE_LIMIT, "Too many sources added in a short time. Please wait a few "

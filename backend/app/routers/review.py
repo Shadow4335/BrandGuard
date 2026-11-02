@@ -1,5 +1,6 @@
 """Run a review, record decisions on findings, and save new versions."""
 import json
+import threading
 from typing import Optional
 
 from collections import defaultdict, deque
@@ -23,6 +24,7 @@ EDITABLE = ("draft", "checked", "changes_requested", "rejected", "approved")
 
 REVIEW_LIMIT, REVIEW_WINDOW = 15, 600  # AI reviews per user per 10 minutes (each one calls the LLM)
 _reviews: dict = defaultdict(deque)
+_save_lock = threading.Lock()
 
 
 def _limit_reviews(request: Request, user: UserContext) -> None:
@@ -136,18 +138,22 @@ def apply_decisions(text: str, findings: list) -> str:
 @router.post("/content/{content_id}/versions", response_model=ContentDetail)
 def save_version(content_id: str, body: VersionCreateIn, user: UserContext = Depends(require_roles(UserRole.CREATOR))):
     store = get_store()
-    content = _own_content(content_id, user)
-    _require_editable(content)
-    cur = store.select("content_versions", {"content_item_id": content_id, "version_number": content["current_version"]})[0]
-    fs = latest_findings(cur["id"])
-    new_text = body.body_text if body.body_text is not None else apply_decisions(cur.get("raw_text") or "", fs)
-    n = content["current_version"] + 1
-    store.insert("content_versions", {
-        "content_item_id": content_id, "org_id": str(user.org_id), "version_number": n, "file_type": cur["file_type"],
-        "raw_text": new_text, "file_path": cur.get("file_path"),
-        "alt_text": body.alt_text if body.alt_text is not None else cur.get("alt_text"),
-        "note": body.note or "Applied accepted and edited suggestions", "created_by": str(user.user_id)})
-    content = store.update("content_items", content_id, {"current_version": n, "status": "checked"})
+    with _save_lock:  # a double click must not get past the "nothing changed" check twice
+        content = _own_content(content_id, user)
+        _require_editable(content)
+        cur = store.select("content_versions", {"content_item_id": content_id, "version_number": content["current_version"]})[0]
+        fs = latest_findings(cur["id"])
+        new_text = body.body_text if body.body_text is not None else apply_decisions(cur.get("raw_text") or "", fs)
+        new_alt = body.alt_text if body.alt_text is not None else cur.get("alt_text")
+        if new_text == (cur.get("raw_text") or "") and (new_alt or "") == (cur.get("alt_text") or ""):
+            raise HTTPException(409, f"Nothing has changed since version {content['current_version']}. "
+                                     "Accept or edit a suggestion first.")
+        n = content["current_version"] + 1
+        store.insert("content_versions", {
+            "content_item_id": content_id, "org_id": str(user.org_id), "version_number": n, "file_type": cur["file_type"],
+            "raw_text": new_text, "file_path": cur.get("file_path"), "alt_text": new_alt,
+            "note": body.note or "Applied accepted and edited suggestions", "created_by": str(user.user_id)})
+        content = store.update("content_items", content_id, {"current_version": n, "status": "checked"})
     log_event(user.org_id, user.user_id, "version_saved", "content_item", content_id,
               {"version": n, "accepted": sum(1 for f in fs if f["status"] == "accepted"),
                "edited": sum(1 for f in fs if f["status"] == "edited")})

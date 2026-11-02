@@ -26,7 +26,7 @@ export default function AboutAiPage() {
         <p className="mt-3">When live AI is enabled, submitted text and retrieved approved-source excerpts may be sent to configured providers. If a provider fails, another configured model or backup provider may also receive that content. Each review records the provider/model that answered or indicates offline fallback. Provider data handling depends on the service and account configuration; this app does not guarantee provider retention or training policies.</p>
         <p className="mt-3">{health?.store === "memory" ? "This server uses seeded in-memory storage. Data resets on restart." : health?.store === "supabase" ? "This server uses Supabase for accounts, database records and uploaded files. API authorization uses the verified account’s role and workspace." : "Storage status has not been confirmed."} The shared demo workspace uses the fictional GlowLeaf Naturals brand. Do not upload confidential material there.</p></section>
       <section><h2 className="font-semibold">Human control and audit</h2>
-        <p>Every finding, decision, comment, approval and override is written to an append-only audit log. A reviewer who approves with high-severity issues unresolved must write an override reason.</p></section>
+        <p>Every finding, decision, comment, approval and override is written to an append-only audit log. Anyone who approves with high-severity issues unresolved must write an override reason.</p></section>
       <p className="text-sm text-zinc-700">The demo brand &ldquo;GlowLeaf Naturals&rdquo; is fictional. See AI_AND_SERVICES.md in the repository for the full list of services, models and libraries.</p>
     </div>
   );

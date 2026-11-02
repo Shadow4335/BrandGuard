@@ -26,7 +26,7 @@ Rules are fast, free, exact and explainable, and regulators care about the exact
 ## Workflow state machine (`backend/app/workflow/state_machine.py`)
 ```
 draft --review--> checked --submit(creator)--> pending_manager ("In review")
-pending_manager --approve(manager)--> approved
+pending_manager --approve(manager; override reason if high-severity findings unresolved)--> approved
 pending_manager --request_changes(manager, reason)--> changes_requested --new version--> checked
 pending_manager --escalate(manager)--> escalated
 escalated --approve(reviewer; override reason if high-severity findings unresolved)--> approved

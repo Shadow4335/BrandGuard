@@ -40,9 +40,10 @@ function NewContent() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
     setBusy(true); setError(null);
     const fd = new FormData();
-    fd.set("title", title || "Untitled"); fd.set("channel", channel); fd.set("ai_generated", String(ai));
+    fd.set("title", title.trim() || "Untitled"); fd.set("channel", channel); fd.set("ai_generated", String(ai));
     fd.set("text", text); fd.set("alt_text", alt);
     if (file) fd.set("file", file);
     try {
@@ -67,14 +68,14 @@ function NewContent() {
       </div>
       <ErrorNote message={error} />
       <form onSubmit={submit} className="space-y-4">
-        <label className="block text-sm font-medium">Title<input required value={title} onChange={(e) => setTitle(e.target.value)} className={input} /></label>
+        <label className="block text-sm font-medium">Title<input required maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} className={input} /></label>
         <label className="block text-sm font-medium">Channel
           <select value={channel} onChange={(e) => setChannel(e.target.value as Channel)} className={input}>
             {CHANNELS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={ai} onChange={(e) => setAi(e.target.checked)} /> This was created or assisted by AI</label>
-        <label className="block text-sm font-medium">Paste text<textarea rows={7} value={text} onChange={(e) => setText(e.target.value)} className={input} /></label>
+        <label className="block text-sm font-medium">Paste text<textarea rows={7} maxLength={100000} value={text} onChange={(e) => setText(e.target.value)} className={input} /></label>
         <label className="block text-sm font-medium">...or upload a file: PDF (including scans), Word .docx, image (PNG, JPG, WEBP, GIF), TXT or HTML, up to 10 MB
           <input type="file" accept=".pdf,.docx,.txt,.md,.html,.htm,image/*" onChange={(e) => {
             const f = e.target.files?.[0] ?? null;

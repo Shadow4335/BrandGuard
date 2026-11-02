@@ -17,7 +17,21 @@ Layout note: the repo's own rules (GEMINI.md) took precedence over BUILD_WORKFLO
 | 5 Insights | Passed | Seeded charts render; `RULE-TONE-HYPE` (62% overridden) and `RULE-CLAIM-UNSUPPORTED` appear under "may be unclear" |
 | 6 Deploy | Passed | Vercel + Render + Supabase live; Golden Path steps 1-10 walked through by Claude on the deployed link (real Supabase login, live Gemini review, decisions, v2 diff, submit, manager escalate, reviewer override approval, audit, Insights). Stranger test completed by a first-time user (reported by the project owner). Repository is public. Backup demo video and Round 2 PDF: [Google Drive](https://drive.google.com/drive/folders/1lYTpx39wpcZCzE3xBsDXBks_W1Axockj?usp=sharing) |
 
-Test suite: `cd backend && python -m pytest -q` (38 tests, offline).
+Test suite: `cd backend && .venv/bin/python -m pytest -q` (offline, no keys).
+
+## Round 3 hardening
+
+Run on a local offline build (in-memory store, rule-based fallback), not against the live site or live AI.
+
+| Check | Status |
+|---|---|
+| Fresh clone, following only the README's offline steps: install, API, frontend, demo sign-in, a review with an image sample, test suite | Passed (Python 3.14, Node 20) |
+| Creator → Manager → Reviewer journey on a production build, including request changes, escalation and an override with a reason | Passed in the in-app browser |
+| Bad input: malformed IDs, empty and oversized fields, wrong roles, bad decisions | Clear 4xx, no 500s (`tests/test_robustness.py`, plus an API stress script) |
+| The same action twice: real double clicks on Save, Submit; repeated reviews | One result, no false errors |
+| Refresh after a review, including on a clean item | Keeps state, no second review |
+| Empty and failure states: new account, unknown page, unknown content, wrong role, server stopped | A clear message and a way out |
+| Phone width (375 px) on sign-in, dashboard, new content, content and review pages | No sideways page scroll |
 
 ## Upload formats and real accounts
 

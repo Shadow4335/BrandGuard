@@ -27,10 +27,31 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def is_uuid(value: Any) -> bool:
+    try:
+        uuid.UUID(str(value))
+        return True
+    except ValueError:
+        return False
+
+
+def strip_nul(value: Any) -> Any:
+    """Postgres text and jsonb can't hold NUL characters, and pasted text or parsed files sometimes contain them."""
+    if isinstance(value, str):
+        return value.replace("\x00", "")
+    if isinstance(value, dict):
+        return {k: strip_nul(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [strip_nul(v) for v in value]
+    return value
+
+
 class Store:
     def select(self, table: str, where: Optional[Row] = None, order: Optional[str] = None,
                desc: bool = False, limit: Optional[int] = None) -> List[Row]: ...
     def get(self, table: str, row_id: str, org_id: Optional[str] = None) -> Optional[Row]:
+        if not is_uuid(row_id):  # a malformed ID is "not found", not a Postgres type error
+            return None
         rows = self.select(table, {"id": row_id, **({"org_id": org_id} if org_id else {})}, limit=1)
         return rows[0] if rows else None
     def select_where_in(self, table: str, column: str, values: List[Any], order: Optional[str] = None,
@@ -133,13 +154,13 @@ class SupabaseStore(Store):
         return rows
 
     def insert(self, table, row):
-        return self.client.table(table).insert(row).execute().data[0]
+        return self.client.table(table).insert(strip_nul(row)).execute().data[0]
 
     def insert_many(self, table, rows):
-        return self.client.table(table).insert(rows).execute().data if rows else []
+        return self.client.table(table).insert(strip_nul(rows)).execute().data if rows else []
 
     def update(self, table, row_id, patch):
-        return self.client.table(table).update(patch).eq("id", row_id).execute().data[0]
+        return self.client.table(table).update(strip_nul(patch)).eq("id", row_id).execute().data[0]
 
     def put_file(self, bucket, path, data, content_type):
         self.client.storage.from_(bucket).upload(path, data, {"content-type": content_type, "upsert": "true"})

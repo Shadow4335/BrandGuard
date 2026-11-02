@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
@@ -18,11 +19,21 @@ export function RequireAuth({ children, roles }: { children: React.ReactNode; ro
     return (
       <div className="max-w-xl mx-auto p-8">
         <p className="font-semibold">This page is for {roles.join(" / ")} accounts.</p>
-        <p className="text-zinc-700 mt-1">Use the role switcher at the top to change role, or go back to your dashboard.</p>
+        <p className="text-zinc-700 mt-1">Demo accounts can change role with the menu in the sidebar.{" "}<Link href="/dashboard" className="underline font-medium">Back to your dashboard</Link></p>
       </div>
     );
   }
   return <>{children}</>;
+}
+
+/** A page that couldn't load, with a way out of it. */
+export function LoadFailed({ message }: { message: string }) {
+  return (
+    <div className="max-w-xl mx-auto p-8">
+      <ErrorNote message={message} />
+      <Link href="/dashboard" className="underline font-medium">Back to your dashboard</Link>
+    </div>
+  );
 }
 
 export function ErrorNote({ message }: { message: string | null }) {

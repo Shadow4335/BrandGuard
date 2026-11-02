@@ -134,12 +134,16 @@ class ReviewResult(BaseModel):
     notice: Optional[str] = None
 
 
+class CommentOut(Comment):
+    author_name: Optional[str] = None
+
+
 class ContentDetail(BaseModel):
     content: ContentItem
     versions: List[ContentVersion]
     findings: List[Finding]
     latest_run: Optional[ReviewRun] = None
-    comments: List[Comment] = Field(default_factory=list)
+    comments: List[CommentOut] = Field(default_factory=list)
     approvals: List[Approval] = Field(default_factory=list)
     creator_name: Optional[str] = None
     allowed_actions: List[str] = Field(default_factory=list)

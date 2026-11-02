@@ -4,7 +4,7 @@ import { hasTextChange, isUnresolvedHigh } from "@/lib/findings";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { RequireAuth, ErrorNote } from "@/components/RequireAuth";
+import { RequireAuth, ErrorNote, LoadFailed } from "@/components/RequireAuth";
 import { StatusBadge } from "@/components/Pills";
 import { HighlightedText } from "@/components/HighlightedText";
 import { FindingCard } from "@/components/FindingCard";
@@ -14,7 +14,27 @@ import { AuditTrail } from "@/components/AuditTrail";
 import { Loading } from "@/components/Loading";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
-import type { ContentDetail, Finding, FindingStatus, Source } from "@/lib/types";
+import type { Approval, ContentDetail, Finding, FindingStatus, Source } from "@/lib/types";
+
+const ROLE_NAMES: Record<string, string> = { manager: "The brand manager", reviewer: "The authorised reviewer" };
+
+/** What the creator should do next, in one line, so nobody has to guess from the status badge. */
+function nextStep(status: string, findings: number, openHigh: number, last?: Approval): string | null {
+  const said = last?.reason ? `: \u201c${last.reason}\u201d` : ".";
+  const who = ROLE_NAMES[last?.role ?? ""] ?? "A reviewer";
+  const fix = findings ? "Accept, edit or reject the findings below, save a new version, then submit again." : "Re-run the review, then submit again.";
+  switch (status) {
+    case "checked": return openHigh
+      ? `Next: choose Accept, Edit or Reject on each finding, save a new version, then submit for review. ${openHigh} high-severity ${openHigh === 1 ? "finding is" : "findings are"} still open.`
+      : "Next: submit for review. A brand manager decides from there.";
+    case "pending_manager": return "With the brand manager. Editing is locked until a decision comes back.";
+    case "escalated": return "Escalated to the authorised reviewer. Editing is locked until a decision comes back.";
+    case "changes_requested": return `${who} requested changes${said} ${fix}`;
+    case "rejected": return `${who} rejected this${said} ${fix}`;
+    case "approved": return "Approved. BrandGuard never publishes anything itself; publishing is up to you. Saving a new version sends it back through review.";
+    default: return null;
+  }
+}
 
 export default function ContentPage() {
   return <RequireAuth><ContentView /></RequireAuth>;
@@ -35,6 +55,7 @@ function ContentView() {
   const [cmpA, setCmpA] = useState<number | null>(null);
   const [tick, setTick] = useState(0);
   const [alt, setAlt] = useState("");
+  const [saving, setSaving] = useState<null | "version" | "submit">(null);
   const autoRan = useRef(false);
 
   const load = useCallback(async () => {
@@ -62,8 +83,9 @@ function ContentView() {
 
   useEffect(() => {
     if (d && !autoRan.current && typeof window !== "undefined" && window.location.search.includes("run=1")
-        && d.findings.length === 0 && profile?.role === "creator") {
+        && !d.latest_run && profile?.role === "creator") {
       autoRan.current = true;
+      window.history.replaceState(null, "", window.location.pathname); // a refresh must not start another review
       runReview();
     }
   }, [d, profile, runReview]);
@@ -81,18 +103,26 @@ function ContentView() {
   const openHigh = findings.filter(isUnresolvedHigh).length;
 
   async function decide(f: Finding, decision: FindingStatus, text?: string, reason?: string) {
-    try { await api.decide(f.id, decision, text, reason); await load(); }
+    try { setError(null); await api.decide(f.id, decision, text, reason); await load(); }
     catch (e) { setError((e as Error).message); }
   }
   async function saveVersion() {
+    if (saving) return;
+    setSaving("version");
     try { setError(null); const x = await api.saveVersion(id); setD(x); setCmpA(null); setTick((t) => t + 1); setNotice(`Saved as version ${x.content.current_version} and re-checked.`); }
     catch (e) { setError((e as Error).message); }
+    finally { setSaving(null); }
   }
   async function saveAltText() {
+    if (saving) return;
+    setSaving("version");
     try { setError(null); const x = await api.saveVersion(id, "Added alt-text", alt.trim()); setD(x); setAlt(""); setTick((t) => t + 1); setNotice(`Alt-text saved as version ${x.content.current_version} and re-checked.`); }
     catch (e) { setError((e as Error).message); }
+    finally { setSaving(null); }
   }
   async function submitForReview() {
+    if (saving) return;
+    setSaving("submit");
     try {
       setError(null); setD(await api.transition(id, "submit")); setTick((t) => t + 1);
       const stillOpen = openHigh ? ` ${openHigh} high-severity ${openHigh === 1 ? "finding is" : "findings are"} still open, and the manager and reviewer will see that.` : "";
@@ -100,9 +130,11 @@ function ContentView() {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
     catch (e) { setError((e as Error).message); }
+    finally { setSaving(null); }
   }
 
-  if (!d || !cur) return error ? <div className="p-8"><ErrorNote message={error} /></div> : <Loading label="Loading content" />;
+  if (!d || !cur) return error ? <LoadFailed message={error} /> : <Loading label="Loading content" />;
+  const hint = isOwner && !running ? nextStep(d.content.status, findings.length, openHigh, d.approvals[d.approvals.length - 1]) : null;
   const prev = d.versions.find((v) => v.version_number === (cmpA ?? d.content.current_version - 1));
 
   return (
@@ -112,12 +144,13 @@ function ContentView() {
         <StatusBadge status={d.content.status} />
         <span className="text-sm text-zinc-700">v{d.content.current_version} · {d.content.channel.replace("_", " ")}{d.content.ai_generated ? " · AI-assisted" : ""}</span>
         <div className="ml-auto flex gap-2">
-          {editable && <button onClick={runReview} disabled={running} className="rounded-lg border border-indigo-700 text-indigo-900 bg-white px-4 py-2 text-sm font-medium disabled:opacity-50">{findings.length ? "Re-run review" : "Run AI review"}</button>}
-          {d.allowed_actions.includes("submit") && <button onClick={submitForReview} className="rounded-lg bg-indigo-700 text-white px-4 py-2 text-sm font-medium">Submit for review</button>}
+          {editable && <button onClick={runReview} disabled={running || !!saving} className="rounded-lg border border-indigo-700 text-indigo-900 bg-white px-4 py-2 text-sm font-medium disabled:opacity-50">{d.latest_run ? "Re-run review" : "Run AI review"}</button>}
+          {d.allowed_actions.includes("submit") && <button onClick={submitForReview} disabled={running || !!saving} className="rounded-lg bg-indigo-700 text-white px-4 py-2 text-sm font-medium disabled:opacity-50">{saving === "submit" ? "Submitting…" : "Submit for review"}</button>}
         </div>
       </header>
 
       <ErrorNote message={error} />
+      {hint && <p className="rounded-lg border border-indigo-300 bg-indigo-50 p-3 text-sm font-medium">{hint}</p>}
       {notice && <p role="status" className="rounded-lg border border-amber-400 bg-amber-50 text-amber-950 p-3 text-sm">{notice}</p>}
       {running && (
         <ol aria-live="polite" className="rounded-lg border border-indigo-300 bg-indigo-50 p-3 text-sm space-y-1">
@@ -151,7 +184,7 @@ function ContentView() {
                 <input value={alt} onChange={(e) => setAlt(e.target.value)} placeholder="Describe the image and any text in it"
                   className="mt-1 w-full border border-zinc-400 rounded px-2 py-1 text-sm" />
               </label>
-              <button onClick={saveAltText} disabled={alt.trim().length < 5} className="rounded-lg bg-emerald-700 text-white px-3 py-1.5 text-sm font-medium disabled:opacity-50">Save as new version</button>
+              <button onClick={saveAltText} disabled={alt.trim().length < 5 || !!saving} className="rounded-lg bg-emerald-700 text-white px-3 py-1.5 text-sm font-medium disabled:opacity-50">Save as new version</button>
             </div>
           )}
           {cur.file_path && !d.has_image && (
@@ -180,7 +213,7 @@ function ContentView() {
           ))}
           {editable && findings.length > 0 && (
             <div className="rounded-lg border border-zinc-300 bg-white p-3 flex flex-wrap items-center gap-3">
-              <button onClick={saveVersion} disabled={decidedCount === 0} className="rounded-lg bg-emerald-700 text-white px-4 py-2 text-sm font-medium disabled:opacity-50">Save as new version</button>
+              <button onClick={saveVersion} disabled={decidedCount === 0 || !!saving || running} className="rounded-lg bg-emerald-700 text-white px-4 py-2 text-sm font-medium disabled:opacity-50">{saving === "version" ? "Saving and re-checking…" : "Save as new version"}</button>
               <span className="text-sm text-zinc-800">{decidedCount === 0 ? "Accept or edit a suggestion to enable saving. " : ""}{decidedCount} accepted/edited · {openHigh} high-severity still open</span>
             </div>
           )}
