@@ -64,7 +64,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       </aside>
       <div className="app-topbar"><span>Workspace <span className="breadcrumb-slash">/</span> {LINKS.find((l) => l.href === path)?.label || "Content review"}</span><div><MotionControl /><Link href="/about-ai" aria-label="About AI"><Info size={18} /></Link>{user && <button onClick={() => signOut()}><LogOut size={16} />Sign out</button>}</div></div>
     </> : <header className={`public-header${scrolled ? " is-scrolled" : ""}`}><Link href="/" aria-label="BrandGuard home" className="public-logo"><BrandLogo /></Link><PublicNav /><div className="public-actions"><MotionControl />{!loading && user ? <Link className="pill-button" href="/dashboard">Dashboard <ArrowUpRight size={16} /></Link> : <><Link href="/login" className="public-signin">Sign in</Link><Link className="pill-button" href="/signup">Get started <ArrowUpRight size={16} /></Link></>}</div></header>}
-    {auth && <SilverWaves className="auth-art"><div><p className="eyebrow">A considered perspective</p><h2>Your brand.<br /><em>In good hands.</em></h2><p>Every word. Every claim. Considered.</p><p>AI suggests. Humans decide.</p></div></SilverWaves>}
+    {auth && <SilverWaves className="auth-backdrop" />}
     <main id="main-content" className={workspace ? "app-main" : auth ? "auth-main" : publicInfo ? "public-info-main" : "marketing-main"}><GovernanceBanner /><div ref={page} className="route-content" key={auth ? path : profile ? `${profile.id}:${profile.org_id}:${profile.role}` : "anonymous"}>{children}</div></main>
     {workspace && <footer className="app-footer">BrandGuard <span>AI suggests. Humans decide.</span><Link href="/about-ai">Responsible by design ↗</Link></footer>}
   </div>;

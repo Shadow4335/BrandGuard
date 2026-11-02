@@ -45,6 +45,7 @@ export default function LoginPage() {
   }
 
   return <div className="login-page">
+    <div className="login-primary">
     <header className="login-heading">
       <p className="eyebrow">A considered perspective</p>
       <h1>Sign in to BrandGuard</h1>
@@ -61,7 +62,9 @@ export default function LoginPage() {
       <div className="login-divider"><span>or</span></div>
       <div className="login-provider"><GoogleSignIn disabled={loading} /></div>
       <p className="login-create">New to BrandGuard? <Link href="/signup">Create an account <ArrowUpRight size={13} /></Link></p>
+      {demoMode && <p className="login-create login-demo-link"><a href="#demo-title">Just exploring? Try a demo role ↓</a></p>}
     </form>
+    </div>
 
     {demoMode === null && <p role="status" className="login-demo-loading">Checking demo availability…</p>}
     {demoMode && <>
