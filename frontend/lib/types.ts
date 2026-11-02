@@ -316,6 +316,9 @@ export interface InsightsSummary {
   most_overridden: RuleStat[];
   status_counts: Record<string, number>;
   override_approvals: number;
+  findings_decided: number;
+  decisions_total: number;
+  decision_trend: { date: string; count: number }[];
   approvals_total: number;
 }
 

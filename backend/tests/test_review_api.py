@@ -164,3 +164,38 @@ def test_review_writes_the_audit_log_in_one_batch(monkeypatch):
 def test_unique_sentences_drops_repeats():
     from app.engine.retrieval import unique_sentences
     assert unique_sentences("Soft lips. soft  LIPS. New formula!") == ["Soft lips.", "New formula!"]
+
+
+def test_low_confidence_by_design_does_not_flag_a_guideline_as_unclear():
+    """Every unsupported-claim finding is low confidence, so that says nothing about how clear the rule is."""
+    unclear = c.get("/api/insights/unclear-rules", headers=login("admin")).json()
+    assert "RULE-CLAIM-UNSUPPORTED" not in {u["rule_id"] for u in unclear}
+    assert all("rejected" in u["reason"] and "disagree" not in u["suggestion"] for u in unclear)
+
+
+def test_seeded_history_has_real_evidence_and_follows_the_approval_rule():
+    h = login("manager")
+    queue = c.get("/api/reviews/queue", headers=h).json()
+    assert queue
+    for card in queue:
+        d = c.get(f"/api/content/{card['content']['id']}", headers=h).json()
+        text = d["versions"][0]["raw_text"]
+        assert "historical sample" not in text and d["findings"]
+        for f in d["findings"]:
+            assert text[f["span"]["start"]:f["span"]["end"]] == f["span_text"]
+            assert "Seeded" not in f["issue"] and f["suggested_fix"] != "n/a"
+    from app.store import get_store
+    from app.workflow.state_machine import unresolved_high
+    from app.engine.pipeline import latest_findings
+    store = get_store()
+    for a in store.select("approvals", {"action": "approve", "role": "manager"}):
+        ver = store.select("content_versions", {"content_item_id": a["content_item_id"], "version_number": 1})[0]
+        if "seeded" == store.select("review_runs", {"content_version_id": ver["id"]})[0].get("model"):
+            assert a["override"] == (unresolved_high(latest_findings(ver["id"])) > 0)
+            assert a["reason"] if a["override"] else True
+
+
+def test_summary_counts_decisions_for_people_who_decide():
+    s = c.get("/api/insights/summary?scope=mine", headers=login("manager")).json()
+    assert s["decisions_total"] >= s["approvals_total"] and len(s["decision_trend"]) == 30
+    assert sum(d["count"] for d in s["decision_trend"]) == s["decisions_total"]

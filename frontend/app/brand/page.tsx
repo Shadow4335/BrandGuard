@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { RequireAuth, ErrorNote } from "@/components/RequireAuth";
 import { SlidingTabs } from "@/components/SlidingTabs";
 import { Loading } from "@/components/Loading";
@@ -19,12 +20,18 @@ const TABS: { id: string; label: string; types: SourceType[] }[] = [
 ];
 
 export default function BrandPage() {
-  return <RequireAuth><Brand /></RequireAuth>;
+  return <RequireAuth><Suspense fallback={<Loading label="Loading brand sources" />}><BrandFromLink /></Suspense></RequireAuth>;
 }
 
-function Brand() {
+/** "Review this guideline" on Insights links here with ?rule=ID. A new rule starts the page afresh on that rule. */
+function BrandFromLink() {
+  const rule = useSearchParams().get("rule");
+  return <Brand key={rule ?? ""} focusRule={rule} />;
+}
+
+function Brand({ focusRule }: { focusRule: string | null }) {
   const { profile } = useAuth();
-  const [tab, setTab] = useState("guideline");
+  const [tab, setTab] = useState(focusRule ? "rules" : "guideline");
   const [sources, setSources] = useState<Source[] | null>(null);
   const [rules, setRules] = useState<RuleInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +41,9 @@ function Brand() {
   const [busy, setBusy] = useState(false);
   const reload = () => api.sources().then(setSources).catch((e) => setError(e.message));
   useEffect(() => { reload(); api.rules().then(setRules).catch((e) => setError(e.message)); }, []);
+  useEffect(() => {
+    if (focusRule) document.getElementById(`rule-${focusRule}`)?.scrollIntoView({ block: "center" }); // once both lists are in
+  }, [focusRule, rules, sources]);
   const current = TABS.find((t) => t.id === tab)!;
   const list = (sources ?? []).filter((s) => current.types.includes(s.source_type));
 
@@ -59,7 +69,7 @@ function Brand() {
       {tab === "rules" ? (
         <ul className="space-y-2">
           {rules.map((r) => (
-            <li key={r.id} className="rounded-lg border border-zinc-300 bg-white p-3">
+            <li key={r.id} id={`rule-${r.id}`} className={`rounded-lg border bg-white p-3 ${r.id === focusRule ? "border-indigo-700 ring-2 ring-indigo-300" : "border-zinc-300"}`}>
               <div className="flex flex-wrap items-center gap-2"><code className="text-xs bg-zinc-100 px-1.5 rounded">{r.id}</code><strong>{r.title}</strong><SeverityPill value={r.severity} /><span className="text-xs text-zinc-700">Layer {r.layer} · {r.category}</span></div>
               <p className="text-sm text-zinc-800 mt-1">{r.why}</p>
               {r.reference && <p className="text-xs text-zinc-700 mt-1">Reference: {r.reference}</p>}

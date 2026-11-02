@@ -6,13 +6,18 @@ import { formatWhen } from "@/lib/utils";
 import type { AuditRow } from "@/lib/types";
 
 export function AuditTrail({ contentId, refreshKey }: { contentId: string; refreshKey?: unknown }) {
-  const [rows, setRows] = useState<AuditRow[]>([]);
-  useEffect(() => { api.audit(contentId).then(setRows).catch(() => setRows([])); }, [contentId, refreshKey]);
-  const important = rows.filter((r) => r.event_type !== "finding_created");
+  const [rows, setRows] = useState<AuditRow[] | null>(null); // null until the first answer
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    api.audit(contentId).then((r) => { setRows(r); setFailed(false); }).catch(() => setFailed(true));
+  }, [contentId, refreshKey]);
+  const important = (rows ?? []).filter((r) => r.event_type !== "finding_created");
   return (
     <section aria-labelledby="audit" className="space-y-2">
       <h2 id="audit" className="font-semibold">Audit trail</h2>
-      {important.length === 0 && <p className="text-sm text-zinc-700">No events yet.</p>}
+      {failed && <p role="alert" className="text-sm text-red-800">The audit trail could not be loaded. Refresh the page to try again.</p>}
+      {!rows && !failed && <p role="status" className="text-sm text-zinc-700">Loading the audit trail…</p>}
+      {rows && !failed && important.length === 0 && <p className="text-sm text-zinc-700">No events yet.</p>}
       <ol className="text-sm space-y-1">
         {important.map((r) => (
           <li key={r.id} className="border-l-2 border-zinc-400 pl-2">

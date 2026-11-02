@@ -209,6 +209,9 @@ class InsightsSummary(BaseModel):
     status_counts: Dict[str, int]
     override_approvals: int = 0
     approvals_total: int = 0
+    findings_decided: int = 0
+    decisions_total: int = 0  # approvals, escalations, change requests and rejections, not submissions
+    decision_trend: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 SignupOut.model_rebuild()

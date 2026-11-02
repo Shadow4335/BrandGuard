@@ -23,7 +23,7 @@
 4. **Explain and cite.** Every finding shows Issue, Why, a rule/source chip (click it to read the approved excerpt), Fix, Severity and Confidence.
 5. **Human decisions.** Creators Accept, Edit or Reject each suggestion (rejections need a reason). *Save as new version* builds the next version only from those decisions, and a diff shows exactly what changed.
 6. **Workflow.** Draft → submitted → manager review / escalation → reviewer approval, with comments. Approving with unresolved high-severity findings requires a written override reason, whoever approves. Every step lands in the audit trail.
-7. **Insights.** The `/insights` page (admin) charts review volume, the most-overridden rules, and flags "Guidelines that may be unclear".
+7. **Insights.** The `/insights` page (admin) charts review volume, the most-rejected rules, and flags "Guidelines that may be unclear".
 8. **Transparency.** `/about-ai` and [AI_AND_SERVICES.md](AI_AND_SERVICES.md) describe what AI does and which services see data.
 
 **Roles:** Creator (submit, resolve findings), Manager (review, comment, escalate), Reviewer (approve/reject), Admin (insights, brand sources, workspaces).

@@ -9,8 +9,11 @@ import io
 import json
 import random
 import uuid
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
+
+from app.workflow.state_machine import unresolved_high
 
 NS = uuid.UUID("6f1c2a3e-0000-4000-8000-00000000b6a2")
 
@@ -203,6 +206,44 @@ HISTORY_RULES = {
 }
 HISTORY_STATUSES = ["approved"] * 9 + ["pending_manager"] * 3 + ["escalated"] * 2 + ["changes_requested"] * 4 + \
                    ["rejected"] * 2 + ["checked"] * 3 + ["draft"] * 2
+HISTORY_SEASONS = ["Monsoon", "Festive", "Winter", "Summer", "Spring"]
+HISTORY_PRODUCTS = ["lip balm", "face wash", "body lotion", "vitamin C serum", "hair oil"]
+# rule_id -> (sentence, flagged phrase, issue, why, suggested fix, replacement, wording if the creator edits it, citations)
+HISTORY_EVIDENCE = {
+    "RULE-ABS-001": ("Our {p} is 100% safe for every skin type.", "100% safe", 'Absolute or guaranteed claim: "100% safe"',
+                     "Absolute claims need complete substantiation and cannot be narrowed by fine print.",
+                     "Soften it to a statement you can support.", "gentle", "gentle", ["REG-CCPA-2022"]),
+    "RULE-TERM-001": ("This {p} is chemical-free and made in small batches.", "chemical-free",
+                      'Banned term "chemical-free" (use "made without parabens and sulfates")',
+                      "This term is on the brand's banned list; use the approved wording.",
+                      'Replace with "made without parabens and sulfates".', "made without parabens and sulfates",
+                      "made without parabens and sulfates", ["TERM-01"]),
+    "RULE-MED-001": ("Our {p} cures dry, irritated skin.", "cures", 'Medical or cure claim on a cosmetic: "cures"',
+                     "Cosmetics must not be presented as treating or curing conditions.",
+                     "Describe care or comfort, not treatment.", "cares for", "soothes", ["REG-DMR", "TERM-01"]),
+    "RULE-SUP-001": ("The {p} is India's #1 choice for daily care.", "India's #1", 'Unsupported superiority claim: "India\'s #1"',
+                     "Ranking claims need independent evidence on file.", "Remove the ranking.", "a popular", "a popular",
+                     ["REG-ASCI-SGC"]),
+    "RULE-DISC-INFL-001": ("Loving my new {p} from GlowLeaf, it's all I use now.", "Loving my new", "Missing #Ad disclosure on a paid post",
+                           "Paid influencer posts must carry a clear disclosure at the start.", "Add #Ad at the start of the post.",
+                           "#Ad Loving my new", "#Ad Loving my new", ["REG-ASCI-INFL"]),
+    "RULE-A11Y-ALT-001": ("[Image: {p} on a shelf, no alt-text supplied]", "no alt-text supplied", "Image has no alt-text",
+                          "Images need alt-text so screen-reader users get the same information.",
+                          "Add alt-text that describes the image and any text in it.", None, "alt-text added", ["GUIDE-VIS-01"]),
+    "RULE-VIS-CONTRAST-001": ("[Banner: pale yellow {p} headline on a white background]", "pale yellow", "Headline contrast is below WCAG AA",
+                              "Text must reach a 4.5:1 contrast ratio against its background.",
+                              "Use a darker colour from the approved palette.", None, "dark green", ["GUIDE-VIS-01", "ASSET-PALETTE"]),
+    "RULE-TONE-HYPE": ("This {p} is a total game-changer!", "game-changer!", "Tone is more excited than the brand voice",
+                       "Brand voice is warm, honest and plain-spoken with no hype.",
+                       "Use plain wording and a calm full stop.", "good everyday choice.", "nice daily habit.", ["GUIDE-TONE-01"]),
+    "RULE-CLAIM-UNSUPPORTED": ("Customers see results from the {p} in 3 days.", "in 3 days", 'Unsupported claim: "in 3 days" has no approved source',
+                               "No approved fact covers this timeframe. No approved source supports this claim.",
+                               "Remove it, or ask an admin to add an approved fact that supports it.", None, "over time", []),
+    "RULE-CLAIM-FACT": ("Your {p} arrives in 1 day in metro cities.", "in 1 day", '"in 1 day" contradicts approved fact FACT-002',
+                        "The approved delivery time for metro cities is 2-4 working days.",
+                        "Use the approved figure.", "in 2-4 working days", "in 2-4 working days", ["FACT-002"]),
+}
+ESCALATE_REASON = "Legal should look at these claims before this goes out."
 
 
 def seed_history(store, org_id: str, creator_id: str, manager_id: str, reviewer_id: str, now: datetime = None) -> None:
@@ -217,20 +258,19 @@ def seed_history(store, org_id: str, creator_id: str, manager_id: str, reviewer_
     for i in range(total_target - sum(per_item)):
         per_item[i % 25] += 1
     for n in range(25):
-        created = now - timedelta(days=29 - n * 29 / 24, hours=rnd.randint(0, 6))
+        # Three hours back so the decisions below, an hour apart, are never in the future
+        created = now - timedelta(days=29 - n * 29 / 24, hours=3 + rnd.randint(0, 6))
         iso = created.isoformat()
         status = HISTORY_STATUSES[n % len(HISTORY_STATUSES)]
         cid, vid, rid = _id(f"hist-c{n}"), _id(f"hist-v{n}"), _id(f"hist-r{n}")
-        items.append({"id": cid, "org_id": org_id, "title": f"Past campaign {n + 1}", "status": status,
+        items.append({"id": cid, "org_id": org_id, "title": f"{HISTORY_SEASONS[n % 5]} {HISTORY_PRODUCTS[n // 5]} campaign", "status": status,
                       "creator_id": creator_id, "channel": rnd.choice(channels), "ai_generated": n % 7 == 0,
                       "current_version": 1, "created_at": iso, "updated_at": iso})
-        versions.append({"id": vid, "content_item_id": cid, "org_id": org_id, "version_number": 1, "file_type": "text/plain",
-                         "raw_text": "(historical sample)", "alt_text": "", "note": "Seeded history", "created_by": creator_id,
-                         "created_at": iso})
         runs.append({"id": rid, "org_id": org_id, "content_item_id": cid, "content_version_id": vid, "version_number": 1,
                      "layer_a_ms": 4, "layer_b_ms": 900, "used_fallback": False, "model": "seeded", "created_at": iso})
         audits.append({"org_id": org_id, "actor_id": creator_id, "event_type": "review_run", "target_type": "content_item",
                        "target_id": cid, "details": {"seeded": True, "findings": per_item[n]}, "created_at": iso})
+        text, item_findings, seen = "", [], Counter()
         for k in range(per_item[n]):
             rule = rnd.choices(rule_ids, weights)[0]
             cat, layer, sev, _, rej, low = HISTORY_RULES[rule]
@@ -238,26 +278,50 @@ def seed_history(store, org_id: str, creator_id: str, manager_id: str, reviewer_
             r = rnd.random()
             st = "open" if not decided else ("rejected" if r < rej else rnd.choice(["accepted", "accepted", "edited"]))
             fid = _id(f"hist-f{n}-{k}")
-            findings.append({
+            sentence, phrase, issue, why, fix, replacement, edit, codes = HISTORY_EVIDENCE[rule]
+            if status == "approved" and n % 4 and sev == "high":  # only every fourth approval went through on an override
+                st = "accepted" if replacement else "edited"
+            # The campaign's own product; a rule that fires twice moves to the next one so no sentence repeats
+            sentence = sentence.format(p=HISTORY_PRODUCTS[(n // 5 + seen[rule]) % 5])
+            seen[rule] += 1
+            text += " " if text else ""
+            start = len(text) + sentence.index(phrase)
+            text += sentence
+            item_findings.append({
                 "id": fid, "content_version_id": vid, "org_id": org_id, "run_id": rid, "layer": layer, "category": cat,
-                "rule_id": rule, "source_ids": [], "source_codes": [], "span": None, "region": None, "span_text": None,
-                "issue": f"Seeded finding for {rule}", "why_flagged": "Seeded historical example.",
-                "suggested_fix": "n/a", "severity": sev, "confidence": "low" if low else ("high" if layer == "A" else "medium"),
-                "status": st, "decided_by": creator_id if st != "open" else None,
-                "decision_reason": "Not applicable here" if st == "rejected" else None,
+                "rule_id": rule, "source_ids": [], "source_codes": codes, "span": {"start": start, "end": start + len(phrase)},
+                "region": None, "span_text": phrase, "issue": issue, "why_flagged": why, "suggested_fix": fix,
+                "replacement": replacement, "severity": sev, "confidence": "low" if low else ("high" if layer == "A" else "medium"),
+                "status": st, "decision_text": edit if st == "edited" else None, "decided_by": creator_id if st != "open" else None,
+                "decision_reason": "Not applicable to this channel" if st == "rejected" else None,
                 "decided_at": iso if st != "open" else None, "created_at": iso})
             if st != "open":
                 audits.append({"org_id": org_id, "actor_id": creator_id, "event_type": "finding_decided",
                                "target_type": "finding", "target_id": fid,
                                "details": {"seeded": True, "decision": st, "rule_id": rule}, "created_at": iso})
+        findings += item_findings
+        versions.append({"id": vid, "content_item_id": cid, "org_id": org_id, "version_number": 1, "file_type": "text/plain",
+                         "raw_text": text, "alt_text": "", "note": "Initial version", "created_by": creator_id, "created_at": iso})
+
+        def decide(actor: str, role: str, action: str, to: str, hours: int, reason: str = None, override: bool = False) -> None:
+            at = (created + timedelta(hours=hours)).isoformat()
+            approvals.append({"org_id": org_id, "content_item_id": cid, "version_number": 1, "actor_id": actor, "role": role,
+                              "action": action, "reason": reason, "override": override, "created_at": at})
+            audits.append({"org_id": org_id, "actor_id": actor, "event_type": f"workflow_{action}", "target_type": "content_item",
+                           "target_id": cid, "details": {"seeded": True, "to": to, "role": role, "reason": reason or "", "override": override},
+                           "created_at": at})
+
         if status in ("pending_manager", "escalated", "approved", "changes_requested", "rejected"):
-            approvals.append({"org_id": org_id, "content_item_id": cid, "version_number": 1, "actor_id": creator_id,
-                              "role": "creator", "action": "submit", "reason": None, "override": False, "created_at": iso})
-            audits.append({"org_id": org_id, "actor_id": creator_id, "event_type": "workflow_submit", "target_type": "content_item",
-                           "target_id": cid, "details": {"seeded": True, "to": "pending_manager"}, "created_at": iso})
+            decide(creator_id, "creator", "submit", "pending_manager", 0)
         if status == "approved":
-            approvals.append({"org_id": org_id, "content_item_id": cid, "version_number": 1, "actor_id": manager_id,
-                              "role": "manager", "action": "approve", "reason": None, "override": n % 4 == 0, "created_at": iso})
+            override = unresolved_high(item_findings) > 0  # the same rule the workflow applies to live approvals
+            decide(manager_id, "manager", "approve", "approved", 1, "Legal cleared these claims for this campaign." if override else None, override)
+        elif status == "changes_requested":
+            decide(manager_id, "manager", "request_changes", "changes_requested", 1, "Please fix the flagged wording and resubmit.")
+        elif status in ("escalated", "rejected"):
+            decide(manager_id, "manager", "escalate", "escalated", 1, ESCALATE_REASON)
+            if status == "rejected":
+                decide(reviewer_id, "reviewer", "reject", "rejected", 2, "These claims can't be substantiated as written.")
     for table, rows in [("content_items", items), ("content_versions", versions), ("review_runs", runs),
                         ("findings", findings), ("approvals", approvals), ("audit_log", audits)]:
         store.insert_many(table, rows)

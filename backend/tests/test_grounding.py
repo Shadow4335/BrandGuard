@@ -97,3 +97,16 @@ def test_two_issues_on_the_same_words_are_both_kept():
 
 def test_text_not_in_the_content_is_still_dropped():
     assert ground(AIOutput(findings=[_ai("clinically tested")]), ctx("Clinically proven care."), []) == []
+
+
+def test_ai_replacement_reaches_the_finding_so_accept_can_apply_it():
+    f = ground(out(replacement="92% naturally derived"), ctx("A 100% natural balm"), [FACT, TONE])[0]
+    assert f.replacement == "92% naturally derived"
+
+
+def test_ai_replacement_is_dropped_when_it_changes_nothing_or_invents_a_figure():
+    text = ctx("A 100% natural balm")
+    assert ground(out(replacement="100% natural"), text, [FACT, TONE])[0].replacement is None
+    assert ground(out(replacement="  "), text, [FACT, TONE])[0].replacement is None
+    assert ground(out(replacement="."), text, [FACT, TONE])[0].replacement is None
+    assert ground(out(replacement="97% natural"), text, [FACT, TONE])[0].replacement is None

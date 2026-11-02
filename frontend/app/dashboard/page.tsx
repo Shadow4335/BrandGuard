@@ -70,7 +70,7 @@ function Dashboard() {
           <div key={s} className="rounded-lg border border-zinc-300 bg-white p-3"><StatusBadge status={s} /><p className="text-2xl font-bold mt-1">{items ? counts[s] ?? 0 : "—"}</p></div>
         ))}
       </section>
-      <DashboardInsights />
+      <DashboardInsights role={profile.role} waiting={counts[profile.role === "reviewer" ? "escalated" : "pending_manager"] ?? 0} />
       <section aria-labelledby="recent">
         <h2 id="recent" className="font-semibold mb-2">Recent content</h2>
         {items && items.length === 0 && (

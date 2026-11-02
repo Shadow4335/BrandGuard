@@ -28,8 +28,8 @@ function Insights() {
   const stats: [string, string][] = [
     ["Findings", String(s.total_findings)],
     ["Content items", String(s.total_content)],
-    ["Override approvals", `${s.override_approvals} of ${s.approvals_total}`],
-    ["Override rate", s.approvals_total ? `${Math.round((100 * s.override_approvals) / s.approvals_total)}%` : "n/a"],
+    ["Approvals with override", `${s.override_approvals} of ${s.approvals_total}`],
+    ["Approval override rate", s.approvals_total ? `${Math.round((100 * s.override_approvals) / s.approvals_total)}%` : "n/a"],
   ];
 
   return (
@@ -52,7 +52,7 @@ function Insights() {
             <li key={u.rule_id} className="rounded-lg bg-white border border-amber-300 p-3 text-sm">
               <strong>{u.title}</strong> <code className="text-xs bg-zinc-100 px-1 rounded">{u.rule_id}</code>
               <p>{u.reason}. {u.suggestion}</p>
-              <Link href="/brand" className="underline font-medium text-indigo-900">Review this guideline</Link>
+              <Link href={`/brand?rule=${encodeURIComponent(u.rule_id)}`} className="underline font-medium text-indigo-900">Review this guideline</Link>
             </li>
           ))}
         </ul>
@@ -91,10 +91,10 @@ function Insights() {
 
       <details className={card}><summary className="cursor-pointer font-medium">View chart data</summary><div className="overflow-x-auto mt-4"><table className="w-full text-sm"><caption className="text-left mb-3">Daily findings · Last 30 days</caption><thead><tr><th className="text-left">Date</th><th className="text-left">Findings</th></tr></thead><tbody>{s.trend.map((d) => <tr key={d.date}><td>{d.date}</td><td>{d.count}</td></tr>)}</tbody></table></div><p className="mt-4 text-sm">By category: {s.by_category.map((c) => `${c.category}: ${c.count}`).join("; ") || "No findings"}.</p><p className="mt-2 text-sm">By rule: {s.top_rules.map((r) => `${r.title}: ${r.count}`).join("; ") || "No findings"}.</p></details>
       <section className={card} aria-labelledby="ov-h">
-        <h2 id="ov-h" className="font-semibold mb-2">Most overridden rules</h2>
+        <h2 id="ov-h" className="font-semibold mb-2">Most rejected rules</h2>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead><tr className="text-left border-b border-zinc-300"><th className="py-1 pr-3">Rule</th><th className="pr-3">Decisions</th><th className="pr-3">Rejected</th><th>Override rate</th></tr></thead>
+            <thead><tr className="text-left border-b border-zinc-300"><th className="py-1 pr-3">Rule</th><th className="pr-3">Decisions</th><th className="pr-3">Rejected</th><th>Rejection rate</th></tr></thead>
             <tbody>
               {s.most_overridden.map((r) => (
                 <tr key={r.rule_id} className="border-b border-zinc-100">
