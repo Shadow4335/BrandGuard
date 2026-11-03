@@ -32,7 +32,7 @@
 
 Open https://brand-guard-lovat.vercel.app. If it seems stuck, wait up to a minute while the free-tier API wakes up.
 
-The demo brand is **GlowLeaf Naturals**, a fictional Indian personal-care brand.
+The demo brand is **GlowLeaf Naturals**, a fictional Indian personal-care brand. The live workspace starts with its brand sources but no content, so queues and Insights fill up as you use it. Running locally in offline mode, or running `seed/seed_demo.py`, adds 25 sample past items.
 
 - **Quick tour:** on the login page click a role; demo accounts sign in with one click (the server signs them in, so there is no password to type).
 - **Your own account:** *Sign up* (top right or under the login form) puts you in as a **Creator**. Manager, Reviewer and Admin need the admin password (`PRIVILEGED_SIGNUP_PASSWORD`) set by whoever runs the deployment. Passwords need 10+ characters. No email confirmation. **Continue with Google** appears when Firebase is configured.

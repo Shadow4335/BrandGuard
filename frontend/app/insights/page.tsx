@@ -58,6 +58,9 @@ function Insights() {
         </ul>
       </section>
 
+      {!s.total_content && !s.total_findings ? (
+        <p className="rounded-lg border border-dashed border-zinc-400 p-4">No activity in the last 30 days. Charts appear here once creators run reviews.</p>
+      ) : <>
       <div className="grid md:grid-cols-2 gap-6">
         <section className={card} aria-labelledby="top-h">
           <h2 id="top-h" className="font-semibold mb-2">Most frequently violated rules</h2>
@@ -106,7 +109,9 @@ function Insights() {
             </tbody>
           </table>
         </div>
+        {s.most_overridden.length === 0 && <p className="text-sm text-zinc-700 mt-2">No decisions on findings yet.</p>}
       </section>
+      </>}
     </div>
   );
 }
