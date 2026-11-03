@@ -4,7 +4,7 @@
 > **AI suggests, humans decide. Nothing is ever auto-edited or auto-published.**
 
 - **Live app:** https://brand-guard-lovat.vercel.app (API: https://brandguard-api-74et.onrender.com). The API sleeps on Render's free tier, so the first load can take up to a minute; the app pings it on load.
-- **Demo video and Round 2 PDF:** [Google Drive folder](https://drive.google.com/drive/folders/1lYTpx39wpcZCzE3xBsDXBks_W1Axockj?usp=sharing)
+- **CodeStar demo videos and PDFs:** [Round 1](https://drive.google.com/drive/folders/1rC-U4PaFDqkD-WyAd2oFC0vsygc7IB2c?usp=sharing) · [Round 2](https://drive.google.com/drive/folders/1lYTpx39wpcZCzE3xBsDXBks_W1Axockj?usp=sharing) · [Round 3](https://drive.google.com/drive/folders/1iNMZozXSbwcavJ8G5jm8vuwA8RWGvLHv?usp=sharing)
 - **Docs:** [ARCHITECTURE.md](ARCHITECTURE.md) · [AI_AND_SERVICES.md](AI_AND_SERVICES.md) · [SECURITY.md](SECURITY.md) · [CHECKLIST.md](CHECKLIST.md) · [BUILD_WORKFLOW.md](BUILD_WORKFLOW.md)
 
 ## What it does
